@@ -36,6 +36,9 @@ class MongoCaseRepository:
     async def update(self, case_id: str, fields: dict[str, Any], now: datetime) -> None:
         await self._col.update_one({"_id": case_id}, {"$set": {**fields, "updated_at": now}})
 
+    async def for_account(self, account_id: str) -> list[dict[str, Any]]:
+        return [plain(d) async for d in self._col.find({"account_id": account_id})]  # type: ignore[misc]
+
     async def count_by_status(self) -> dict[str, int]:
         cursor = await self._col.aggregate([{"$group": {"_id": "$status", "n": {"$sum": 1}}}])
         return {d["_id"]: d["n"] async for d in cursor}  # type: ignore[misc]

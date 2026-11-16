@@ -80,7 +80,7 @@ class MongoTransactionRepository:
         nxt = str(docs[limit - 1]["_id"]) if len(docs) > limit else None
         return [_row(d) for d in docs[:limit]], nxt
 
-    async def by_sender(self, sender_ref: str, start: datetime, end: datetime) -> list[dict[str, Any]]:
-        """Entries where ``sender_ref`` is the counterparty (sender overlap tool)."""
-        cursor = self._col.find({"counterparty.ref_id": sender_ref, "ts": {"$gte": start, "$lt": end}}, LEDGER_PROJECTION)
+    async def by_senders(self, sender_refs: list[str], start: datetime, end: datetime) -> list[dict[str, Any]]:
+        """Entries whose counterparty is one of ``sender_refs`` (one indexed query)."""
+        cursor = self._col.find({"counterparty.ref_id": {"$in": sender_refs}, "ts": {"$gte": start, "$lt": end}}, LEDGER_PROJECTION)
         return [_row(d) async for d in cursor]

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Protocol
 
 from backend.app.core.clock import Clock
@@ -20,6 +20,13 @@ from backend.app.domain.policy.config import PlaybookConfig, ScoringConfig
 from backend.app.domain.policy.detector_rules import WindowStats, evaluate, priority
 
 DAY_SECONDS = 86_400
+IST_OFFSET = timedelta(hours=5, minutes=30)
+
+
+def dataset_window_end(as_of: date) -> datetime:
+    """Exclusive end of the dataset: ``as_of`` + 1 day at 00:00 IST, in UTC."""
+    nxt = as_of + timedelta(days=1)
+    return datetime(nxt.year, nxt.month, nxt.day, tzinfo=UTC) - IST_OFFSET
 
 
 class TransactionScanPort(Protocol):

@@ -31,3 +31,8 @@ def get_system_service(request: Request) -> SystemService:
 def get_extra(request: Request, name: str) -> Any:
     """Return a named application object built by ``core/wiring.py``."""
     return get_container(request).extras[name]
+
+
+def get_app(request: Request) -> Any:
+    """Return the wired application objects (services, runner, repositories)."""
+    return get_container(request).extras["app"]

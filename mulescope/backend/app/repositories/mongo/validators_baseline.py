@@ -50,6 +50,7 @@ BASELINE_VALIDATORS: Mapping[str, JsonSchema] = MappingProxyType(
         Col.LLM_CACHE: _baseline(string_id()),
         Col.EVAL_RUNS: _baseline(string_id()),
         Col.EVAL_RESULTS: _baseline(string_id()),
+        Col.COUNTERS: _baseline(string_id()),
     }
 )
 """Baseline operational validators keyed by collection name."""

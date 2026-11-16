@@ -34,6 +34,7 @@ class OperationalCollection(StrEnum):
     EVAL_RUNS = "eval_runs"
     EVAL_RESULTS = "eval_results"
     DATASET_META = "dataset_meta"
+    COUNTERS = "counters"
 
 
 @unique

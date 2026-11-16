@@ -133,5 +133,8 @@ class PlaybookConfig(_Cfg):
     version: str
     sla_days_by_priority: dict[int, int]
     str_due_days: int
+    tipping_off_terms: list[str]
+    str_required_sections: list[str]
+    required_evidence_kinds: list[str]
     actions: dict[str, ActionSpec]
     rules: list[PlaybookRule]

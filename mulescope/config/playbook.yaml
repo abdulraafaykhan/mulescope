@@ -16,6 +16,15 @@ sla_days_by_priority:
 # guidance before any real use. Kept as configuration on purpose.
 str_due_days: 7
 
+# Customer-facing text must never contain these (no tipping-off).
+tipping_off_terms: [str, suspicious, suspicion, investigation, investigate, fraud, money laundering, laundering, mule, police, fiu, report filed, frozen, freeze, blocked, alert]
+
+# Headings every STR narrative must contain (who, what, when, where, how, why, amounts, accounts).
+str_required_sections: [Who, What, When, Where, How, Why suspicious, Amounts, Accounts]
+
+# Evidence kinds the sufficiency check requires before scoring.
+required_evidence_kinds: [metric, profile, flow, complaint_check]
+
 actions:
   record_closure_reason: {type: record_closure_reason, owner_role: analyst, due_in_days: 0, requires_approval: false, reversible: false, mock_tool: write_case_note, description: "Record why the case is closed, citing evidence ids"}
   suppress_similar_alerts: {type: suppress_similar_alerts, owner_role: analyst, due_in_days: 0, requires_approval: true, reversible: true, mock_tool: create_suppression, params: {days: 60}, description: Suppress similar alerts on this account for 60 days}
