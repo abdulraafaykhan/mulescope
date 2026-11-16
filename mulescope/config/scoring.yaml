@@ -54,7 +54,7 @@ signals:
     description: Funds left within minutes of arriving
   low_retention:
     weight: 10
-    thresholds: {max_retention_ratio: 0.05}
+    thresholds: {max_retention_ratio: 0.2}
     description: End-of-day balances stay near zero relative to inflow
   profile_mismatch:
     weight: 15

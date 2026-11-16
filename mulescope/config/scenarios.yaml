@@ -60,8 +60,9 @@ scenarios:
     variants:
       classic:
         count: 2
-        personas: [gig_worker, salaried]
+        personas: [gig_worker]
         opened_days_before_window: [100, 170]
+        declared_turnover: [20000, 35000]
         senders: [25, 45]
         median_credit: 12000
         exit_minutes: [6, 75]

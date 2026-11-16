@@ -1,6 +1,7 @@
-"""Detection signals: one module per signal plus the signal registry.
+"""Risk signals and mitigators. Importing this package registers all of them.
 
-Signals are pure functions over typed inputs, registered with
-``@register_signal`` so new signals are added without editing existing code.
-Called by the detection service. Populated from M1 onward.
+Used by ``domain/policy/scoring.py``; add a signal by creating a function with
+``@register_signal`` and a matching entry in ``config/scoring.yaml``.
 """
+
+from backend.app.domain.signals import mitigators, risk_signals  # noqa: F401  (registration)

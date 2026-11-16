@@ -37,6 +37,8 @@ dev = [
 dev = "backend.app.main:run"
 seed = "datagen.cli:main"
 evals = "evals.cli:main"
+check-policy = "evals.check_policy:main"
+smoke = "evals.smoke:main"
 
 [build-system]
 requires = ["hatchling==1.33.0"]
