@@ -1,12 +1,223 @@
-# MuleScope synthetic data scenarios (M0 placeholder).
+# MuleScope synthetic data parameters (build prompt section 6).
 #
-# Scenario mix, volumes and pattern parameters for datagen live here.
-# Filled in by M1 (synthetic data and detector).
+# Read by datagen. Counts, sender ranges, delays and noise live here, never in
+# code. Amounts are rupees, delays are minutes unless the key says days.
 
-version: "0.1.0"
+version: "1.0.0"
+generator_version: "1.0.0"
 
-# Dataset-wide generation parameters (volumes, date range, seed). TODO verify.
-dataset: {}
+dataset:
+  dataset_days: 180
+  window_days: 14
+  history_days: 90
+  batch_size: 5000
 
-# Mule and benign scenario definitions. TODO verify.
-scenarios: {}
+population:
+  persona_shares:
+    salaried: 0.35
+    small_business: 0.12
+    freelancer: 0.08
+    student: 0.08
+    homemaker: 0.08
+    retired: 0.07
+    gig_worker: 0.07
+    professional: 0.08
+    treasurer: 0.04
+    dormant: 0.03
+  counterparty_pools:
+    individual: 330
+    employer: 40
+    supplier: 35
+    vendor: 12
+    client: 25
+    local_shop: 15
+    food: 14
+    grocery: 12
+    utility: 10
+    fuel: 5
+    retail: 12
+    medical: 6
+    recharge: 3
+    platform: 8
+    wallet: 4
+    lender: 6
+    pension: 3
+    travel: 5
+    bank: 3
+    gov: 1
+  # Ganesh Chaturthi week (2026-09-14) gets a spending spike.
+  festival:
+    start: "2026-09-10"
+    end: "2026-09-17"
+  organic_noise:
+    accounts: 6
+    friends: [8, 12]
+    share: [2500, 6000]
+
+# Planted scenarios: 40 alerts in five parametrised classes.
+scenarios:
+  mule:
+    variants:
+      classic:
+        count: 2
+        personas: [gig_worker, salaried]
+        opened_days_before_window: [100, 170]
+        senders: [25, 45]
+        median_credit: 12000
+        exit_minutes: [6, 75]
+        planted_signals: [fan_in, fast_exit, low_retention, consolidation, profile_mismatch, dormant_or_new]
+      profile_mismatch:
+        count: 2
+        personas: [student, homemaker]
+        opened_days_before_window: [95, 160]
+        declared_turnover: [5000, 8000]
+        senders: [22, 35]
+        median_credit: 9000
+        exit_minutes: [5, 60]
+        planted_signals: [fan_in, fast_exit, low_retention, profile_mismatch, dormant_or_new, consolidation]
+      cashout:
+        count: 2
+        personas: [gig_worker, student]
+        opened_days_before_window: [100, 170]
+        senders: [20, 32]
+        median_credit: 10000
+        exit_minutes: [10, 80]
+        planted_signals: [fan_in, fast_exit, low_retention, cashout_channel, consolidation, profile_mismatch]
+      victim_linked:
+        count: 2
+        personas: [salaried, gig_worker]
+        opened_days_before_window: [110, 175]
+        senders: [22, 38]
+        median_credit: 11000
+        exit_minutes: [6, 70]
+        complaint_senders: [3, 5]
+        planted_signals: [fan_in, fast_exit, low_retention, victim_linked, consolidation]
+      layered:
+        count: 1
+        personas: [salaried]
+        opened_days_before_window: [100, 160]
+        declared_turnover: [25000, 40000]
+        senders: [16, 20]
+        median_credit: 13000
+        exit_minutes: [5, 45]
+        beneficiaries: [1, 1]
+        upstream_accounts: 2
+        upstream_senders: [3, 4]
+        planted_signals: [fan_in, fast_exit, low_retention, consolidation, profile_mismatch]
+      injected_remark:
+        count: 1
+        personas: [gig_worker]
+        opened_days_before_window: [100, 170]
+        senders: [25, 40]
+        median_credit: 12000
+        exit_minutes: [6, 75]
+        planted_signals: [fan_in, fast_exit, low_retention, consolidation, profile_mismatch, injected_remark]
+  seller:
+    variants:
+      shop:
+        count: 5
+        occupations: [Textile shop owner, Electronics retailer, Sweet shop owner, Footwear store owner, Kirana store owner]
+        opened_days_before_window: [500, 2500]
+        history_days: 100
+        sales_per_day: [5, 7]
+        median_sale: 2400
+        loyal_customers: [100, 140]
+        loyal_share: 0.75
+        supplier_share: [0.72, 0.85]
+        planted_signals: [established_pattern, repeat_senders, consistent_business_profile]
+      online_with_refunds:
+        count: 3
+        opened_days_before_window: [400, 1500]
+        history_days: 100
+        sales_per_day: [6, 8]
+        median_sale: 1800
+        refund_share: 0.22
+        supplier_share: [0.45, 0.55]
+        planted_signals: [reciprocal_flows, established_pattern, consistent_business_profile]
+      freelancer:
+        count: 2
+        opened_days_before_window: [600, 2000]
+        clients: [4, 5]
+        history_days: 100
+        history_gap_days: [6, 10]
+        window_invoices: [5, 6]
+        invoice_amounts: [50000, 60000, 75000, 80000, 90000, 100000, 120000]
+        vendor_share: [0.6, 0.72]
+        planted_signals: [repeat_senders, structured_amounts, consistent_business_profile]
+  group:
+    variants:
+      society_fund:
+        count: 4
+        opened_days_before_window: [800, 3000]
+        members: [70, 90]
+        pay_share: 0.85
+        amounts: [1500, 2100, 2500, 3100, 5100]
+        festivals: [Diwali fund, Navratri utsav, Kali Puja fund]
+        planted_signals: [repeat_senders, consolidation]
+      rent_split_or_chit:
+        count: 4
+        opened_days_before_window: [600, 2500]
+        occupations: [Chit group organiser, Kitty group organiser]
+        members: [16, 24]
+        installment: [10000, 18000]
+        collect_day: 19
+        commission: 0.05
+        planted_signals: [repeat_senders, consolidation, low_retention]
+  dormant:
+    variants:
+      mule_like:
+        count: 3
+        opened_days_before_window: [1500, 4000]
+        occupations: [Farmer, Retired, Shopkeeper (inactive)]
+        declared_turnover: [12000, 25000]
+        kyc_status: re_kyc_due
+        kyc_age_days: [1900, 2900]
+        silent_days: [380, 460]
+        senders: [18, 26]
+        median_credit: 9000
+        exit_minutes: [180, 600]
+        planted_signals: [fan_in, low_retention, dormant_or_new, consolidation, profile_mismatch]
+      legit:
+        count: 3
+        opened_days_before_window: [1500, 4000]
+        occupations: [Retired, Farmer, Homemaker]
+        declared_turnover: [20000, 40000]
+        kyc_status: verified
+        kyc_age_days: [200, 700]
+        silent_days: [380, 520]
+        large_credit: [800000, 2500000]
+        outflow_shares: [0.25, 0.2, 0.18, 0.12]
+        planted_signals: [dormant_or_new, profile_mismatch]
+  ambiguous:
+    variants:
+      new_business:
+        count: 2
+        opened_days_before_window: [55, 80]
+        occupations: [Home bakery owner, Online reseller, Cloud kitchen owner]
+        declared_turnover: [15000, 25000]
+        early_sales_per_day: 0.8
+        sales_per_day: [2.8, 3.6]
+        median_sale: 4500
+        exit_minutes: [1440, 3600]
+        sweep_fraction: [0.6, 0.75]
+        planted_signals: [fan_in, dormant_or_new, consolidation, profile_mismatch]
+      partial_signals:
+        count: 2
+        opened_days_before_window: [120, 170]
+        declared_turnover: [12000, 18000]
+        senders: [18, 28]
+        median_credit: 8000
+        exit_minutes: [1440, 2880]
+        sweep_fraction: [0.7, 0.8]
+        planted_signals: [fan_in, dormant_or_new, consolidation, profile_mismatch]
+      complaint_coincidence:
+        count: 2
+        occupations: [Kirana store owner, Mobile accessories shop owner]
+        opened_days_before_window: [700, 2500]
+        history_days: 100
+        sales_per_day: [5, 7]
+        median_sale: 2200
+        loyal_customers: [100, 130]
+        loyal_share: 0.75
+        supplier_share: [0.72, 0.85]
+        planted_signals: [victim_linked, established_pattern, repeat_senders]

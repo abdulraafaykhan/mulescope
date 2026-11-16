@@ -1,5 +1,7 @@
-"""Planted scenarios: one class per scenario type, configured by ``config/scenarios.yaml``.
+"""Planted scenarios: five parametrised classes configured by ``config/scenarios.yaml``.
 
-Called by ``datagen.cli`` during seeding; each scenario also records its
-ground truth in the truth database. Populated in M1.
+Importing this package registers every scenario class. Called by
+``datagen.cli`` during seeding; ground truth goes only to the truth database.
 """
+
+from datagen.scenarios import ambiguous, dormant, group, mule, seller  # noqa: F401  (registration)

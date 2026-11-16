@@ -1,16 +1,130 @@
-# MuleScope scoring configuration (M0 placeholder).
+# MuleScope scoring configuration (build prompt section 8).
 #
-# Signal weights, thresholds and priority bands for the detector and scorer
-# live here, never as literals in domain/ or services/ (section 10.2).
-# Filled in by the milestone that implements detection and scoring.
+# Loaded into backend/app/domain/policy/config.py:ScoringConfig. Weights and
+# thresholds are starting values from section 8, tuned against the 40 planted
+# scenarios. Amounts are INR.
 
-version: "0.1.0"
+version: "1.0.0"
+policy_version: "policy-1.0.0"
 
-# Per-signal weights. TODO verify: define when signals are implemented.
-weights: {}
+# PassThroughDetector (section 6.4): raises an alert when any rule fires on
+# the 14-day window ending at the dataset as_of date.
+detector:
+  rule_version: "1.0.0"
+  window_days: 14
+  rules:
+    fan_in_pass_through:
+      min_senders: 15
+      min_inflow: 150000
+      min_pass_through: 0.5
+    high_value_pass_through:
+      min_inflow: 300000
+      min_pass_through: 0.55
+    dormant_reactivation:
+      min_dormancy_days: 180
+      min_inflow: 100000
+  priority:
+    high_inflow: 500000
+    high_senders: 30
+    medium_inflow: 200000
 
-# Alert and priority thresholds. TODO verify: define when scoring is implemented.
-thresholds: {}
+metrics:
+  history_days: 90
+  # median_exit_minutes: minutes until cumulative outflow after a credit
+  # reaches this share of the credit.
+  exit_match_ratio: 0.9
+  pass_through_hours: 24
+  round_amount: 1000
+  # TODO verify: channel limits used for "just under a limit" structuring.
+  structuring_limits: [50000, 100000, 200000]
+  structuring_margin: 0.05
+  cash_like_channels: [atm, wallet_load]
+  business_keywords: [shop, store, retail, seller, trader, business, owner, freelance, consultant, merchant, organiser, treasurer, bakery, kitchen, reseller]
+  top_beneficiaries: 2
 
-# Priority bands mapping scores to alert priority. TODO verify.
-priority_bands: {}
+# Risk signals (section 8.2). Weights sum to 100.
+signals:
+  fan_in:
+    weight: 15
+    thresholds: {min_count: 15, min_unrelated_ratio: 0.7}
+    description: Many unrelated senders paid in during the window
+  fast_exit:
+    weight: 20
+    thresholds: {max_median_exit_minutes: 90, min_pass_through: 0.7}
+    description: Funds left within minutes of arriving
+  low_retention:
+    weight: 10
+    thresholds: {max_retention_ratio: 0.05}
+    description: End-of-day balances stay near zero relative to inflow
+  profile_mismatch:
+    weight: 15
+    thresholds: {min_turnover_multiple: 10}
+    description: Turnover far above what the customer declared
+  dormant_or_new:
+    weight: 8
+    thresholds: {max_age_days: 180, min_dormancy_days: 180}
+    description: Account is new or was dormant before the window
+  consolidation:
+    weight: 7
+    thresholds: {min_concentration: 0.7}
+    description: Outflows go to one or two beneficiaries
+  cashout_channel:
+    weight: 7
+    thresholds: {min_cashout_share: 0.4}
+    description: Outflows leave through ATM or wallet loads
+  victim_linked:
+    weight: 15
+    thresholds: {one_sender_points: 6, many_senders: 3}
+    description: Senders appear in open fraud complaints
+  structured_amounts:
+    weight: 3
+    thresholds: {min_share: 0.3}
+    description: Credits are round or just under a limit
+
+# Mitigators (subtract; total floored at 0).
+mitigators:
+  established_pattern:
+    weight: 15
+    thresholds: {max_zscore: 1, min_history_days: 90}
+    description: Window volume matches a long, steady history
+  repeat_senders:
+    weight: 12
+    thresholds: {min_ratio: 0.4}
+    description: Most senders also paid in the prior 90 days
+  reciprocal_flows:
+    weight: 8
+    thresholds: {min_share: 0.2}
+    description: Money flows back to the same senders (refunds, settlements)
+  consistent_business_profile:
+    weight: 10
+    thresholds: {max_turnover_multiple: 3}
+    description: Business occupation with turnover in line with declarations
+
+disposition:
+  close_below: 40
+  str_at: 70
+  # Within this many points of a threshold, take the more cautious outcome.
+  caution_band: 5
+  str_min_signals: 3
+  str_required_any: [fast_exit, victim_linked]
+  hard_floor_victim_senders: 3
+
+typologies:
+  rapid_pass_through:
+    requires_all: [fast_exit, low_retention]
+    description: Funds pass through the account within minutes and almost nothing stays.
+  inbound_mule_collection:
+    requires_all: [fan_in, consolidation]
+    description: Many unrelated people pay in and the money is collected out to one or two parties.
+  cash_out_layering:
+    requires_all: [cashout_channel]
+    description: Incoming funds are converted to cash or wallet balances soon after arrival.
+  dormant_account_misuse:
+    requires_all: [dormant_or_new, fan_in]
+    description: A new or long-dormant account suddenly receives many unrelated payments.
+  profile_inconsistent_activity:
+    requires_all: [profile_mismatch]
+    description: Activity is far above what the customer declared at KYC.
+  victim_funds_receipt:
+    requires_all: [victim_linked]
+    description: Some senders have reported these payments as fraud.

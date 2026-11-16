@@ -75,6 +75,7 @@ class Channel(StrEnum):
     ATM = "atm"
     CARD_POS = "card_pos"
     WALLET_LOAD = "wallet_load"
+    CASH_DEPOSIT = "cash_deposit"
 
 
 @unique
@@ -104,20 +105,36 @@ class ActionType(StrEnum):
 
 @unique
 class AlertStatus(StrEnum):
-    """Lifecycle status of a detector alert.
+    """Lifecycle status of a detector alert."""
 
-    Stub: members are defined when alerts are implemented (M1/M3), because
-    the build prompt does not yet name the status values.
-    """
+    OPEN = "open"
+    IN_CASE = "in_case"
+    CLOSED = "closed"
 
 
 @unique
 class CaseStatus(StrEnum):
     """Lifecycle status of an investigation case.
 
-    Stub: members are defined when cases are implemented (M3), because the
-    build prompt does not yet name the status values.
+    ``returned`` means the analyst rejected the recommendation; the case needs
+    a new run.
     """
+
+    NEW = "new"
+    INVESTIGATING = "investigating"
+    AWAITING_DECISION = "awaiting_decision"
+    CLOSED = "closed"
+    ESCALATED = "escalated"
+    STR_DRAFTED = "str_drafted"
+    RETURNED = "returned"
+
+
+@unique
+class Direction(StrEnum):
+    """Side of a ledger entry."""
+
+    CREDIT = "credit"
+    DEBIT = "debit"
 
 
 @unique

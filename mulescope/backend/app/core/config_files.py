@@ -30,6 +30,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from backend.app.core.errors import DependencyUnavailable
+from backend.app.domain.policy.config import PlaybookConfig, ScoringConfig
 
 __all__ = [
     "LLM_CONFIG_FILENAME",
@@ -204,6 +205,28 @@ def load_yaml_model[ModelT: BaseModel](path: Path, model: type[ModelT]) -> Model
             f"Config file failed validation: {path} ({exc.error_count()} error(s))",
             detail={**detail, "errors": errors},
         ) from exc
+
+
+def load_scoring_config(config_dir: Path) -> ScoringConfig:
+    """Load ``scoring.yaml`` (detector, metrics, signals, policy, typologies)."""
+    return load_yaml_model(config_dir / "scoring.yaml", ScoringConfig)
+
+
+def load_playbook_config(config_dir: Path) -> PlaybookConfig:
+    """Load ``playbook.yaml`` (actions, rules, SLAs)."""
+    return load_yaml_model(config_dir / "playbook.yaml", PlaybookConfig)
+
+
+def load_scenarios_config(config_dir: Path) -> dict[str, Any]:
+    """Load ``scenarios.yaml`` as a plain mapping (datagen parameters)."""
+    path = config_dir / "scenarios.yaml"
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise DependencyUnavailable(f"Config file could not be loaded: {path}", detail={"path": str(path)}) from exc
+    if not isinstance(raw, dict):
+        raise DependencyUnavailable(f"Config file must be a mapping: {path}", detail={"path": str(path)})
+    return raw
 
 
 def load_llm_config(config_dir: Path) -> LlmConfig:

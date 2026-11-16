@@ -16,6 +16,9 @@ dependencies = [
     "langgraph-checkpoint-mongodb==0.5.1",
     # Section 10.2: thresholds, model names and limits live in config/*.yaml; stdlib has no YAML parser.
     "pyyaml==6.0.3",
+    # Section 2: synthetic data with Faker (en_IN) and NumPy, seeded RNG.
+    "faker==40.54.0",
+    "numpy==2.5.5",
 ]
 
 [dependency-groups]

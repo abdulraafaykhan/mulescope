@@ -1,19 +1,46 @@
-# MuleScope investigation and action playbook (M0 placeholder).
+# MuleScope action playbook (build prompt section 8.4).
 #
-# Dispositions, allowed actions, SLAs and regulatory reporting rules live
-# here. Regulatory values (reporting deadlines, freeze and hold rules,
-# monetary thresholds) must be confirmed against current regulation before
-# they are filled in.
+# Loaded into backend/app/domain/policy/config.py:PlaybookConfig. Execution is
+# mocked by writing to the actions collection. Rules are evaluated in order;
+# every matching rule adds its actions (deduplicated by type).
 
-version: "0.1.0"
+version: "1.0.0"
 
-# Case SLAs by priority. TODO verify: confirm against internal policy.
-sla: {}
+# Internal case SLA by alert priority (1 = highest). TODO verify against policy.
+sla_days_by_priority:
+  1: 2
+  2: 5
+  3: 10
 
-# Allowed actions per disposition. TODO verify.
-actions: {}
+# TODO verify: STR filing deadline must be checked against current FIU-IND
+# guidance before any real use. Kept as configuration on purpose.
+str_due_days: 7
 
-# Regulatory reporting rules (deadlines, thresholds, filing types).
-# TODO verify: every value here is regulatory and must be checked against
-# the current applicable regulation before use.
-regulatory: {}
+actions:
+  record_closure_reason: {type: record_closure_reason, owner_role: analyst, due_in_days: 0, requires_approval: false, reversible: false, mock_tool: write_case_note, description: "Record why the case is closed, citing evidence ids"}
+  suppress_similar_alerts: {type: suppress_similar_alerts, owner_role: analyst, due_in_days: 0, requires_approval: true, reversible: true, mock_tool: create_suppression, params: {days: 60}, description: Suppress similar alerts on this account for 60 days}
+  store_feedback: {type: store_feedback, owner_role: analyst, due_in_days: 0, requires_approval: false, reversible: false, mock_tool: store_detector_feedback, description: Store false-positive feedback for detector tuning}
+  request_customer_clarification: {type: request_customer_clarification, owner_role: analyst, due_in_days: 7, requires_approval: true, reversible: false, mock_tool: queue_customer_message, description: Send a neutral request for information to the customer}
+  enhanced_monitoring: {type: enhanced_monitoring, owner_role: analyst, due_in_days: 60, requires_approval: true, reversible: true, mock_tool: enable_monitoring, params: {days: 60}, description: Monitor the account closely for 60 days}
+  senior_review: {type: senior_review, owner_role: senior_reviewer, due_in_days: 3, requires_approval: false, reversible: false, mock_tool: assign_reviewer, description: Ask a senior reviewer to look at the case}
+  refresh_kyc: {type: refresh_kyc, owner_role: analyst, due_in_days: 14, requires_approval: true, reversible: false, mock_tool: open_kyc_refresh, description: Start a KYC refresh}
+  soft_limit_reduction: {type: soft_limit_reduction, owner_role: senior_reviewer, due_in_days: 1, requires_approval: true, reversible: true, mock_tool: set_soft_limit, description: Reduce daily outward transfer limits}
+  temporary_debit_hold: {type: temporary_debit_hold, owner_role: senior_reviewer, due_in_days: 1, requires_approval: true, reversible: true, mock_tool: place_debit_hold, description: Place a temporary debit hold (human approval required)}
+  create_str_draft: {type: create_str_draft, owner_role: senior_reviewer, due_in_days: 7, requires_approval: true, reversible: false, mock_tool: create_str_draft, description: Create the STR draft for maker-checker review}
+  preserve_evidence: {type: preserve_evidence, owner_role: analyst, due_in_days: 0, requires_approval: false, reversible: false, mock_tool: lock_case_evidence, description: Lock the case evidence}
+  relationship_review: {type: relationship_review, owner_role: senior_reviewer, due_in_days: 30, requires_approval: true, reversible: false, mock_tool: open_relationship_review, description: Review whether to keep the relationship}
+  flag_linked_accounts: {type: flag_linked_accounts, owner_role: analyst, due_in_days: 2, requires_approval: true, reversible: true, mock_tool: create_linked_alerts, description: Raise low-priority alerts on linked accounts at our bank}
+  notify_fraud_ops: {type: notify_fraud_ops, owner_role: analyst, due_in_days: 1, requires_approval: false, reversible: false, mock_tool: notify_fraud_ops, description: Tell fraud operations about the victim complaints}
+  check_linked_wallets: {type: check_linked_wallets, owner_role: analyst, due_in_days: 3, requires_approval: false, reversible: false, mock_tool: check_wallets, description: Check wallets that received funds}
+
+rules:
+  - {name: close, disposition: close, actions: [record_closure_reason, suppress_similar_alerts, store_feedback]}
+  - {name: escalate, disposition: escalate, actions: [request_customer_clarification, enhanced_monitoring]}
+  - {name: escalate_high_amount, disposition: escalate, min_amount: 300000, actions: [senior_review]}
+  - {name: escalate_kyc, disposition: escalate, signals_any: [profile_mismatch], actions: [refresh_kyc]}
+  - {name: escalate_stale_kyc, disposition: escalate, stale_kyc: true, actions: [refresh_kyc]}
+  - {name: escalate_high_score, disposition: escalate, min_score: 55, actions: [soft_limit_reduction]}
+  - {name: str, disposition: str_draft, actions: [temporary_debit_hold, create_str_draft, preserve_evidence, relationship_review]}
+  - {name: str_linked, disposition: str_draft, linked_accounts: true, actions: [flag_linked_accounts]}
+  - {name: victim_linked, signals_any: [victim_linked], actions: [notify_fraud_ops]}
+  - {name: cashout, signals_any: [cashout_channel], actions: [check_linked_wallets]}
