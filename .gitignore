@@ -12,6 +12,12 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+*.egg-info/
+build/
+
+# Logs and temp files
+*.log
+*.tmp
 
 # Frontend
 node_modules/
