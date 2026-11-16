@@ -1,0 +1,19 @@
+# MuleScope investigation and action playbook (M0 placeholder).
+#
+# Dispositions, allowed actions, SLAs and regulatory reporting rules live
+# here. Regulatory values (reporting deadlines, freeze and hold rules,
+# monetary thresholds) must be confirmed against current regulation before
+# they are filled in.
+
+version: "0.1.0"
+
+# Case SLAs by priority. TODO verify: confirm against internal policy.
+sla: {}
+
+# Allowed actions per disposition. TODO verify.
+actions: {}
+
+# Regulatory reporting rules (deadlines, thresholds, filing types).
+# TODO verify: every value here is regulatory and must be checked against
+# the current applicable regulation before use.
+regulatory: {}

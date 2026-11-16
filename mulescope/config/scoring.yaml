@@ -1,0 +1,16 @@
+# MuleScope scoring configuration (M0 placeholder).
+#
+# Signal weights, thresholds and priority bands for the detector and scorer
+# live here, never as literals in domain/ or services/ (section 10.2).
+# Filled in by the milestone that implements detection and scoring.
+
+version: "0.1.0"
+
+# Per-signal weights. TODO verify: define when signals are implemented.
+weights: {}
+
+# Alert and priority thresholds. TODO verify: define when scoring is implemented.
+thresholds: {}
+
+# Priority bands mapping scores to alert priority. TODO verify.
+priority_bands: {}

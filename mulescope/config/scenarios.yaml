@@ -1,0 +1,12 @@
+# MuleScope synthetic data scenarios (M0 placeholder).
+#
+# Scenario mix, volumes and pattern parameters for datagen live here.
+# Filled in by M1 (synthetic data and detector).
+
+version: "0.1.0"
+
+# Dataset-wide generation parameters (volumes, date range, seed). TODO verify.
+dataset: {}
+
+# Mule and benign scenario definitions. TODO verify.
+scenarios: {}

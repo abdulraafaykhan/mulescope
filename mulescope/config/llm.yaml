@@ -1,0 +1,46 @@
+# MuleScope LLM configuration (M0 placeholder).
+#
+# Loaded by backend/app/core/config_files.py into LlmConfig. Model names,
+# temperatures and cache retention live here, never as literals in code
+# (build prompt section 10.2). Real model choices are made when the LLM
+# provider layer is implemented.
+
+version: "0.1.0"
+
+# Provider connection keys come from the environment only
+# (GROQ_API_KEY, GEMINI_API_KEY). Never put keys in this file.
+providers:
+  groq:
+    # TODO verify: pick the Groq model when the provider layer is built.
+    default_model: "TODO-groq-model"
+  gemini:
+    # TODO verify: pick the Gemini model when the provider layer is built.
+    default_model: "TODO-gemini-model"
+
+# Per-agent model routing. Each agent names a primary provider and model,
+# plus a temperature. All values are placeholders until the agents exist.
+# The provider split comes from build prompt section 2: Groq runs the
+# Profiler, Flow Analyst and Critic, Gemini Flash runs only the Narrative
+# Writer. The small model is for routing and critique, the larger one only
+# for the narrative.
+agents:
+  profiler:
+    provider: groq
+    model: "TODO-groq-model"
+    temperature: null # TODO verify: set when the agent is implemented
+  flow_analyst:
+    provider: groq
+    model: "TODO-groq-model"
+    temperature: null # TODO verify: set when the agent is implemented
+  narrative_writer:
+    provider: gemini
+    model: "TODO-gemini-model"
+    temperature: null # TODO verify: set when the agent is implemented
+  critic:
+    provider: groq
+    model: "TODO-groq-model"
+    temperature: null # TODO verify: set when the agent is implemented
+
+# Response cache. ttl_days is the source of the llm_cache created_at TTL index.
+cache:
+  ttl_days: 30
