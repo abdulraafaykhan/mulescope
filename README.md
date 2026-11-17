@@ -2,62 +2,117 @@
 
 An AML triage copilot for one alert type: **mule accounts and rapid pass-through activity**.
 
-A bank's detector flags an account that receives money from many senders and moves it out within minutes. MuleScope investigates the alert, scores it, recommends **Close**, **Escalate** or **STR Draft**, writes the narrative, and waits for an analyst to approve.
+A bank's detector flags an account that receives money from many senders and moves it out within minutes. MuleScope investigates the alert, scores it, recommends **Close**, **Escalate** or **STR Draft**, writes the narrative, and waits for an analyst to approve. Actions such as holds or KYC refresh are proposed, approved by a human, and executed as mock writes to the database.
 
-The design rule is simple: the investigation and the writing are separate from the decision. Metrics, scores and the recommended disposition are computed by deterministic code. An analyst can override the recommendation, but only with a reason, and the override is logged.
+The design rule: the investigation and the writing are separate from the decision. Metrics, the score and the recommended disposition are deterministic code. Agents explain and write; only an analyst can override the policy, and the reason is logged.
 
-## What is implemented
+## Scope
 
-- **Synthetic dataset.** Seeded and reproducible: about 300 customers, 330 accounts, 590 counterparties and 50,000 ledger entries over 180 days. Indian context (names, VPAs, IFSC codes, UPI / IMPS / NEFT / RTGS / ATM / wallet channels), persona-based behaviour, double-entry transfers and consistent running balances.
-- **40 planted alerts with hidden ground truth.** Mules, legitimate sellers, group collections, dormant accounts and ambiguous cases, including a mule whose transaction remarks try to instruct an AI reviewer. Ground truth lives in a separate database that the API never opens.
-- **Pass-through detector.** Scans a 14-day window, applies thresholds from `config/scoring.yaml`, and creates an alert and a case for each hit.
-- **Deterministic scoring and policy.** Flow metrics, nine risk signals, four mitigators, a score from 0 to 100, typology labels and a disposition policy. All weights and thresholds are configuration. On the 40 planted alerts the policy matches the expected disposition every time, and no mule is closed.
-- **Investigation graph (LangGraph).** Profiler and Flow Analyst run in parallel, evidence is collected into a ledger with `EVD-` ids, then scoring, action planning, narrative and a critic check. The run pauses for the analyst, then resumes on their decision. Runs survive an API restart through a MongoDB checkpointer.
-- **Analyst decisions and actions.** Approve, edit, override (reason required), request more evidence or reject. Proposed actions come from `config/playbook.yaml` and can be approved, rejected or reversed one by one. Execution is mocked by writing to the database.
-- **Audit trail.** Every graph step is recorded, with a tamper-evident hash chain per case and a verify endpoint.
-- **API.** Versioned REST under `/api/v1` plus a Server-Sent Events stream per run. The money-flow endpoint returns ready-to-render nodes and edges.
+**In scope:** mule and rapid pass-through alerts, alert detection, case queue, investigation graph (Profiler, Flow Analyst, Narrative Writer, Critic), deterministic scoring and disposition policy, action planning with a mock executor, analyst approval, tamper-evident audit trail, diagnostics, report export, evals.
 
-Agent text is currently generated from deterministic templates, so a run needs no LLM keys and takes about 3 seconds.
+**Out of scope:** card fraud, account takeover, phishing, sanctions screening, real-time blocking, real bank integrations and real customer data. All data in this project is synthetic.
 
-## How an investigation runs
+## Architecture
 
 ```
-load_case -> compute_metrics -> [ profiler || flow_analyst ] -> aggregate_evidence
-   -> sufficiency_check (max 1 loop back to flow_analyst)
-   -> score_and_policy -> plan_actions -> narrative_writer -> critic (max 1 loop)
-   -> analyst_gate  [pauses for a human]
-   -> apply_decision -> execute_actions (mock) -> finalize
+                 React UI (Vite, :5173)
+   queue · case workspace · money flow · agents · actions · audit · evals
+                 |  REST /api/v1            ^  SSE /runs/{id}/stream
+                 v                          |
++------------------------- FastAPI (:8000) ---------------------------+
+|  api/routers (thin)  ->  services  ->  repositories (one per coll.) |
+|                            |                                        |
+|                            v                                        |
+|   LangGraph case graph (compiled once, Mongo checkpointer)          |
+|   load_case -> compute_metrics -> [profiler || flow_analyst]        |
+|     -> aggregate_evidence -> sufficiency_check (max 1 loop)         |
+|     -> score_and_policy -> plan_actions -> narrative_writer         |
+|     -> critic (max 1 loop) -> analyst_gate [INTERRUPT]              |
+|     -> apply_decision -> execute_actions (mock) -> finalize         |
+|                                                                     |
+|   domain/ (pure): metrics, signal registry, scoring, policy,        |
+|                   typologies, action planner      <- config/*.yaml  |
++---------------------------------------------------------------------+
+                 |                                   
+                 v                                   
+   MongoDB `mulescope` (operational)       MongoDB `mulescope_truth`
+   accounts, transactions, alerts,         ground_truth only. Opened by
+   cases, evidence, reports, actions,      `uv run seed` and `uv run evals`,
+   audit_logs (hash chain), runs,          never by the API or agents.
+   node_executions, eval_runs, ...
 ```
 
-## Tech stack
+Every node is wrapped by one decorator that writes a `node_executions` row, appends an audit event to the case hash chain and publishes a live progress event. Runs pause at `analyst_gate` and resume on the analyst decision, also after an API restart.
 
-Python 3.12 and `uv`, FastAPI, Pydantic v2, LangGraph with `langgraph-checkpoint-mongodb`, MongoDB 7 (PyMongo async client), Faker (`en_IN`) and NumPy.
+## What works
 
-## Getting started
+- **Synthetic dataset**, seeded and reproducible: about 300 customers, 330 accounts, 590 counterparties and 50,000 ledger entries over 180 days. Indian context (en_IN names, VPAs, IFSC, UPI / IMPS / NEFT / RTGS / ATM / wallet), persona-driven behaviour, double-entry transfers and consistent running balances.
+- **40 planted alerts** from five parametrised scenario classes (mule, seller, group collection, dormant, ambiguous), including a mule whose remarks try to instruct the AI reviewer. Labels live only in `mulescope_truth`.
+- **Pass-through detector** over the 14-day window, thresholds in `config/scoring.yaml`, one alert and case per hit.
+- **Deterministic policy**: 9 risk signals, 4 mitigators, score 0-100, typologies, disposition rules with a caution band and a victim-linked hard floor, playbook-driven actions.
+- **Investigation graph** in LangGraph with parallel investigators, an `EVD-` evidence ledger, critic code checks (citations exist, disposition matches policy, STR sections present, no tipping-off words) and the analyst interrupt.
+- **Analyst UI**: alert queue with KPIs and filters; case workspace with the sender / flagged account / receiver strip, score breakdown, evidence list, React Flow money-flow graph with a replay slider, timeline, virtualised transactions, report with EVD citation chips, live agent stepper over SSE, per-action approve / reject / reverse, audit log with hash-chain badge, diagnostics drawer and an account drawer; Evals page.
+- **Eval harness**: `uv run evals --mode fallback|live` runs all 40 alerts end to end, resumable.
 
-Requirements: Python 3.12, [uv](https://docs.astral.sh/uv/), and a MongoDB 7 instance (Atlas or local). All commands are PowerShell, run from `mulescope/`.
+Agent text is generated from deterministic templates (`LLM_MODE=fallback`), so a run needs no LLM keys and takes about 3 seconds. Live Groq / Gemini agents are the next phase (see `PROGRESS.md`).
+
+## Setup (PowerShell)
+
+Requirements: Python 3.12, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ or 22.12+ and a MongoDB 7 instance (Atlas, or local with `docker compose up -d` in `mulescope/`).
 
 ```powershell
 cd mulescope
 uv sync
-Copy-Item .env.example .env      # then set MONGO_URI and MONGO_TRUTH_URI
-uv run seed --seed 42 --customers 300 --reset
-uv run dev
+Copy-Item .env.example .env      # set MONGO_URI and MONGO_TRUTH_URI; LLM keys may stay empty
+cd frontend
+npm install
+Copy-Item .env.example .env.local   # VITE_API_URL=http://127.0.0.1:8000
 ```
 
-The settings loader also reads a `.env` in the repository root. The API starts at http://127.0.0.1:8000 and the interactive docs are at http://127.0.0.1:8000/docs.
+The API allows the UI origin through `CORS_ORIGINS` (default `http://localhost:5173` and `http://127.0.0.1:5173`). The settings loader also reads a `.env` in the repository root.
 
-`MONGO_TRUTH_URI` is only used by the seed and check commands. The API process never loads it.
+## Run
 
-### Commands
+From `mulescope/`, in three terminals:
+
+```powershell
+uv run seed --seed 42 --customers 300 --reset   # generate, load and detect (about a minute on Atlas)
+uv run dev                                       # API at http://127.0.0.1:8000, docs at /docs
+cd frontend; npm run dev                         # UI at http://localhost:5173
+```
+
+`--reset` drops both databases, including every case, run and audit log, so stop the API first.
+
+In the UI: open a case from the queue, press **Start investigation**, watch the Agents panel, then review the money flow, report and actions and press **Approve** (or Edit, Override, Request more, Reject).
 
 | Command | What it does |
 | --- | --- |
-| `uv run seed --seed 42 --customers 300 --reset` | Generates the dataset, loads it, runs the detector and prints counts and any planted account without an alert |
-| `uv run seed --preview ACC-123456` | Prints one account's 14-day transaction story |
-| `uv run check-policy` | Prints expected vs predicted disposition for the 40 planted alerts and the accuracy |
-| `uv run smoke` | Runs one mule and one seller through the full graph and prints the outcome |
-| `uv run dev` | Starts the API |
+| `uv run seed --seed 42 --customers 300 --reset` | Generate the dataset, load it, run the detector, print counts and any planted account without an alert |
+| `uv run seed --preview ACC-123456` | Print one account's 14-day story |
+| `uv run check-policy` | Expected vs predicted disposition for the 40 planted alerts (code only) |
+| `uv run smoke` | One mule and one seller through the full graph with auto-approve |
+| `uv run evals --mode fallback` | All 40 alerts through the graph; results on the Evals page |
+| `uv run evals --mode live --resume` | Continue the latest unfinished live eval run, skipping evaluated cases |
+| `uv run dev` | Start the API |
+
+## Eval results
+
+Policy version `policy-1.0.0`, graph `0.1.0`, dataset seed 42.
+
+| Check | Result |
+| --- | --- |
+| Disposition accuracy, seed 42 (`uv run check-policy`) | 40 / 40 (100%) |
+| Mules closed by mistake, seed 42 | 0 |
+| Disposition accuracy, seed 7, no retuning | 40 / 40, 0 mules closed |
+| Fallback graph runs (`uv run smoke`) | mule -> STR draft, seller -> Close, about 3 s each, audit chains valid |
+
+**Read these numbers carefully.**
+
+- The policy weights and thresholds in `config/scoring.yaml` were **tuned on the seed-42 planted alerts** (two of three allowed iterations). The seed-42 accuracy is **in-sample**.
+- The seed-7 run used the same weights with no retuning. But seed 7 comes from the **same generator** with the same scenario definitions, so it is a synthetic-to-synthetic check, not evidence of performance on real bank data.
+- **Known fragility:** three planted mules score **65, 65 and 68**. They are below the STR threshold of 70 and reach STR draft only through the near-threshold caution rule (score within 5 points of 70 with the STR conditions met). A small change in a weight or in the generated data could drop them to Escalate.
+
+The full-graph eval (`uv run evals --mode fallback`) also measures citation validity, claim coverage, tipping-off violations, whether the injected-remark mule was obeyed, fallback rate, latency and tokens. It stores the results for the Evals page. It has not been run against the current dataset yet (see `PROGRESS.md`). Live-mode results will follow the live LLM phase.
 
 ## API overview
 
@@ -70,24 +125,21 @@ The settings loader also reads a `.env` in the repository root. The API starts a
 | Runs | `GET /runs/{run_id}/stream` (SSE), `GET /runs/{run_id}/diagnostics` |
 | Accounts | `GET /accounts/{id}`, `GET /accounts/{id}/summary` |
 | Actions | `PATCH /actions/{id}` (approve, reject, reverse) |
-| Audit | `GET /audit` |
-
-A quick way to try it: open `/docs`, call `GET /api/v1/cases`, pick a case with status `new`, start a run with `POST /cases/{id}/runs`, then read the evidence, report and actions and finish with `POST /cases/{id}/decision`.
+| Audit, evals | `GET /audit`, `GET /evals/runs`, `GET /evals/runs/{id}` |
 
 ## Repository layout
 
 ```
 mulescope/
-  backend/app/     api, services, graph, agents, domain logic, repositories, core
-  datagen/         synthetic data generator and scenarios
-  evals/           check-policy and smoke commands
+  backend/app/     api, services, graph, agents, domain, repositories, core
+  datagen/         synthetic data generator and planted scenarios
+  evals/           check-policy, smoke and the eval harness
   config/          scoring, playbook, scenario and LLM settings (YAML)
-docs/              BUILD_PROMPT.md, the project specification
-PROGRESS.md        current state of the build
+  frontend/        React + Vite + TypeScript analyst UI
+docs/              BUILD_PROMPT.md, the specification
+PROGRESS.md        build checklist, decisions and known gaps
 ```
 
-## Scope
+## Known limits
 
-**In scope:** mule and rapid pass-through alerts, case queue, investigation, deterministic scoring and policy, action planning with a mock executor, analyst approval, audit trail and diagnostics.
-
-**Out of scope:** card fraud, account takeover, phishing, sanctions screening, real-time blocking, real bank integrations and real customer data. All data in this project is synthetic.
+The STR maker-checker reviewer gate is not built (one analyst gate). There is no light theme, no keyboard shortcuts and no Audit explorer or Settings screen. The SSE stream has no heartbeat, so the UI reconnects and refetches on a drop. The full list is in `PROGRESS.md`.

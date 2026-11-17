@@ -19,7 +19,9 @@ Set `MONGO_URI` and `MONGO_TRUTH_URI` in `.env`. They can point at the same clus
 uv run seed --seed 42 --customers 300 --reset   # generate, load and run the detector (about a minute on Atlas)
 uv run check-policy                              # expected vs predicted disposition for the 40 planted alerts
 uv run smoke                                     # one mule and one seller through the graph
+uv run evals --mode fallback                     # all 40 alerts through the graph, results on the Evals page
 uv run dev                                       # API at http://127.0.0.1:8000, docs at /docs
+cd frontend; npm install; npm run dev            # UI at http://localhost:5173
 ```
 
 `uv run seed --reset` drops and recreates the `mulescope` and `mulescope_truth` databases, so stop the API first.
@@ -36,7 +38,8 @@ uv run dev                                       # API at http://127.0.0.1:8000,
 | `backend/app/graph` | state, nodes, edges, builder, checkpointer |
 | `backend/app/api` | routers, schemas, error handling |
 | `datagen` | personas, counterparties, ledger builder, scenarios, writers, validation |
-| `evals` | `check-policy` and `smoke` commands |
+| `evals` | `check-policy`, `smoke` and the `evals` harness |
+| `frontend` | React + Vite + TypeScript analyst UI |
 | `config` | `scoring.yaml`, `playbook.yaml`, `scenarios.yaml`, `llm.yaml` |
 
 ## Configuration

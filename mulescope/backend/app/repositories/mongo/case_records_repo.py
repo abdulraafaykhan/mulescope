@@ -163,3 +163,23 @@ class MongoEvalRepository:
 
     async def results(self, run_id: str) -> list[dict[str, Any]]:
         return [plain(d) async for d in self._results.find({"run_id": run_id})]  # type: ignore[misc]
+
+    # --- writes: used only by the eval harness (uv run evals) ---------------
+
+    async def create_run(self, doc: dict[str, Any]) -> None:
+        await self._runs.insert_one(doc)
+
+    async def update_run(self, run_id: str, fields: dict[str, Any]) -> None:
+        await self._runs.update_one({"_id": run_id}, {"$set": fields})
+
+    async def latest_unfinished(self, mode: str) -> dict[str, Any] | None:
+        """Most recent eval run in ``mode`` that has not completed (resume target)."""
+        return plain(await self._runs.find_one({"mode": mode, "status": "running"}, sort=[("created_at", -1)]))
+
+    async def save_result(self, doc: dict[str, Any]) -> None:
+        """Upsert one per-case result; ``_id`` is ``run_id:case_id`` so reruns replace it."""
+        await self._results.replace_one({"_id": doc["_id"]}, doc, upsert=True)
+
+    async def done_case_ids(self, run_id: str) -> set[str]:
+        """Cases already evaluated without error in ``run_id`` (skipped on resume)."""
+        return {d["case_id"] async for d in self._results.find({"run_id": run_id, "error": None}, {"case_id": 1})}

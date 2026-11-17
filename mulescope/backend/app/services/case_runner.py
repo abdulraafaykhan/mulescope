@@ -92,6 +92,10 @@ class CaseRunner:
         """Drive the graph inline (scripts and smoke tests)."""
         await self._drive(run_id, payload)
 
+    def is_driving(self, run_id: str) -> bool:
+        """True when this process has a live task driving ``run_id``."""
+        return run_id in self._tasks
+
     async def wait(self, run_id: str) -> None:
         task = self._tasks.get(run_id)
         if task:

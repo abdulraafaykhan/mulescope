@@ -13,7 +13,7 @@ smoke commands only, commit after each phase). This run stopped after phase 3 as
 - [x] Phase 3: API and graph in fallback mode. Smoke: `uv run smoke` mule -> STR draft, seller -> Close, ~3 s per run, audit chains valid; resume after API restart verified.
 - [ ] Phase 4: live LLM agents (Groq/Gemini provider, cache, limiter, prompts, structured output). Keys in `.env` are empty, so fallback stays on.
 - [x] Phase 5: analyst UI (React + Vite + TS, queue, case workspace, flow graph, agents stepper over SSE, actions, audit, diagnostics). Smoke: `npm run build` passes (tsc clean). Not yet clicked through against a live API: this clone has no `.env`, so the API cannot reach Mongo (see Known gaps).
-- [ ] Phase 6: `uv run evals --mode fallback|live`, Evals page, README.
+- [x] Phase 6: `uv run evals --mode fallback|live` (harness, resumable with `--resume`), Evals page, README. Smoke: CLI imports and `--help` parse. Not yet run end to end, because there is no `.env` / Mongo in this clone. First command once the `.env` is back: `uv run evals --mode fallback`.
 
 ## State of the build
 
@@ -57,6 +57,10 @@ Frontend (`mulescope/frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
 - UI SSE: the stream has no heartbeat and its history lives in API memory. `useRunStream` reconnects with backoff (1 s to 10 s), clears live events on each connect (the server replays history), and refetches the case and node_executions on every drop. The Agents stepper layers live events over persisted node_executions, and case/diagnostics poll every 3 s while a run is `running`, so a silent drop or API restart cannot leave it stale.
 - UI score breakdown is built from the `signal` evidence items (fired signals and mitigators with points); there is no separate breakdown endpoint.
 - UI decisions: Approve and Request more post directly; Edit, Override and Reject open a dialog (override and reject require a reason, matching the API rules).
+- Evals: `evals/harness.py` starts a run per planted case, auto-approves, and saves each result as soon as it is known (`_id = eval_run:case`). `--resume` (latest unfinished run of the mode) or `--resume EVAL-0003` skips cases already evaluated without error. A run stays `running` until all 40 are in without error. A case run left `running` by a dead process is marked failed and restarted.
+- Evals metrics: predicted is the case's policy disposition after the run. Citation validity is cited ids that exist in the run's evidence divided by all cited ids. Claim coverage uses the critic's claim-line rule. Fallback rate counts LLM-agent nodes that used the template. Latency is harness wall time per case, including the auto-approve resume.
+- `eval_results` store the scenario name, label and expected disposition so the Evals page can show per-scenario pass/fail. They are written only by the CLI, and no agent tool reads that collection. This deviates from "no answers inside" for eval results; the truth database stays the only source of labels.
+- README states that the weights were tuned on the seed-42 alerts (in-sample), that seed 7 is a synthetic-to-synthetic check, and that three mules scoring 65, 65 and 68 reach STR only through the caution band.
 - CORS: `CORS_ORIGINS` (JSON list) already defaulted to `http://localhost:5173` and `http://127.0.0.1:5173`; now documented in `.env.example` with `VITE_API_URL`.
 
 ## Known gaps
@@ -82,6 +86,7 @@ uv run seed --seed 42 --customers 300 --reset   # generate + load + detect (~1 m
 uv run seed --preview ACC-123456                 # one account's 14-day story
 uv run check-policy                              # expected vs predicted for the 40 planted alerts
 uv run smoke                                     # mule + seller through the graph, auto-approve
+uv run evals --mode fallback                     # 40 alerts end to end; --resume to continue a run
 uv run dev                                       # API on http://127.0.0.1:8000 (/health, /docs)
 cd frontend; npm install; npm run dev            # UI on http://localhost:5173
 ```
