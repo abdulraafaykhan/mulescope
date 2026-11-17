@@ -52,7 +52,9 @@ agents:
     provider: groq
     model: "openai/gpt-oss-20b"
     temperature: 0
-    max_tokens: 1200
+    # gpt-oss reasons before it writes; at 1200 the reasoning used the whole budget on
+    # some drafts and Groq answered 400 json_validate_failed with an empty failed_generation.
+    max_tokens: 3000
 
 # Free-tier protection: one global semaphore across all agents.
 limits:
