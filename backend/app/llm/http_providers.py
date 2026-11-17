@@ -16,6 +16,26 @@ import httpx
 from backend.app.llm.provider import LlmRequest, LlmResponse, ProviderError
 
 RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504}
+ERROR_BODY_MAX = 200
+MESSAGE_MAX = 120
+FAILED_GENERATION_MAX = 400
+
+
+def _error_text(resp: httpx.Response) -> str:
+    """Short error text: status, provider error code, message and a ``failed_generation`` excerpt.
+
+    Why: Groq answers HTTP 400 ``json_validate_failed`` with the rejected
+    model output in ``failed_generation``; a plain prefix of the body cut it
+    off and made the cause invisible. Never includes the request or the key.
+    """
+    try:
+        error = resp.json()["error"]
+        code = error.get("code") or error.get("type") or ""
+        head = f"HTTP {resp.status_code} {code}".strip() + f": {str(error.get('message', ''))[:MESSAGE_MAX]}"
+        failed = error.get("failed_generation")
+        return f"{head}; failed_generation: {str(failed)[:FAILED_GENERATION_MAX]!r}" if failed else head
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return f"HTTP {resp.status_code}: {resp.text[:ERROR_BODY_MAX]}"
 
 
 def _retry_after(resp: httpx.Response) -> float | None:
@@ -36,7 +56,7 @@ async def _post(client: httpx.AsyncClient, url: str, body: dict[str, Any], heade
         raise ProviderError(f"transport error: {type(exc).__name__}", retryable=True) from exc
     if resp.status_code >= 400:
         # Error bodies can be long; keep the start for diagnostics, never the request.
-        raise ProviderError(f"HTTP {resp.status_code}: {resp.text[:200]}", retryable=resp.status_code in RETRYABLE_STATUS, retry_after=_retry_after(resp))
+        raise ProviderError(_error_text(resp), retryable=resp.status_code in RETRYABLE_STATUS, retry_after=_retry_after(resp))
     data: dict[str, Any] = resp.json()
     return data
 

@@ -36,6 +36,8 @@ from backend.app.llm.provider import LLMProvider, LlmRequest, ProviderError
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 _logger = get_logger(__name__)
 _JSON_FENCE = ("```json", "```")
+# Long enough to keep a Groq error code and a failed_generation excerpt.
+ERROR_MAX = 700
 
 
 class CachePort(Protocol):
@@ -178,13 +180,13 @@ class LlmClient:
                 meta.errors.append(f"{label}: timeout after {call_limit:g}s")
                 raise LLMUnavailable(f"{label}: timeout after {call_limit:g}s") from exc
             except ProviderError as exc:
-                meta.errors.append(f"{label}: {exc}"[:200])
+                meta.errors.append(f"{label}: {exc}"[:ERROR_MAX])
                 remaining = deadline - loop.time()
                 too_long = exc.retry_after is not None and (exc.retry_after > backoff_cap or exc.retry_after > remaining)
                 wait = min(exc.retry_after if exc.retry_after is not None else delay, backoff_cap)
                 if not exc.retryable or attempt == last_attempt or too_long or wait >= remaining:
                     # Not retryable, out of attempts, or waiting is not worth it: next model.
-                    raise LLMUnavailable(f"{label} failed: {exc}"[:300]) from exc
+                    raise LLMUnavailable(f"{label} failed: {exc}"[:ERROR_MAX]) from exc
                 meta.retries += 1
                 _logger.warning("llm retry", extra={"provider": provider.name, "attempt": attempt + 1, "wait_s": wait})
                 await asyncio.sleep(wait)

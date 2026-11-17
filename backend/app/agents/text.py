@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 IST = timedelta(hours=5, minutes=30)
 REMARK_MAX = 140
-REASON_MAX = 300
+REASON_MAX = 900
 REASON_SEPARATOR = "; "
 _EVD_REF = re.compile(r"\[?(?P<id>EVD-\d{6})\]?")
 _SPACE_RUN = re.compile(r"[ \t]{2,}")
@@ -60,7 +60,8 @@ def fallback_reason(exc: Exception) -> str:
 
     Joins the ``provider/model: cause`` strings the LLM client collected in
     ``exc.detail["errors"]``; falls back to the exception message when there
-    are none. The strings hold no keys or prompts. Trimmed to 300 characters.
+    are none. The strings hold no keys or prompts. Trimmed to 900 characters, enough for a Groq error
+    code and a short ``failed_generation`` excerpt.
     """
     detail = getattr(exc, "detail", None)
     errors = detail.get("errors") if isinstance(detail, dict) else None
