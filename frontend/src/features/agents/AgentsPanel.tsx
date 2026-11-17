@@ -19,6 +19,7 @@ interface Row {
   message: string | null;
   latency: number | null;
   tokens: number;
+  reason: string | null;
   exec: NodeExecution | null;
 }
 
@@ -34,12 +35,12 @@ const ICON: Record<Row["status"], ReactNode> = {
 function buildRows(execs: NodeExecution[], events: RunEvent[]): Map<string, Row> {
   const rows = new Map<string, Row>();
   for (const e of execs) {
-    rows.set(e.node, { status: e.status, message: e.output_summary ?? e.error ?? null, latency: e.latency_ms, tokens: e.tokens_in + e.tokens_out, exec: e });
+    rows.set(e.node, { status: e.status, message: e.output_summary ?? e.error ?? null, latency: e.latency_ms, tokens: e.tokens_in + e.tokens_out, reason: e.fallback_reason ?? null, exec: e });
   }
   for (const ev of events) {
     if (ev.type !== "node") continue;
     const prev = rows.get(ev.node);
-    rows.set(ev.node, { status: ev.status, message: ev.message, latency: ev.latency_ms ?? (ev.status === "running" ? null : prev?.latency ?? null), tokens: ev.tokens || prev?.tokens || 0, exec: prev?.exec ?? null });
+    rows.set(ev.node, { status: ev.status, message: ev.message, latency: ev.latency_ms ?? (ev.status === "running" ? null : prev?.latency ?? null), tokens: ev.tokens || prev?.tokens || 0, reason: ev.fallback_reason ?? prev?.reason ?? null, exec: prev?.exec ?? null });
   }
   return rows;
 }
@@ -49,6 +50,7 @@ function Details({ exec }: { exec: NodeExecution | null }) {
   return (
     <div className="space-y-1 px-3 pb-2 text-xs">
       {exec.output_summary && <div className="text-secondary">{exec.output_summary}</div>}
+      {exec.fallback_reason && <div className="break-words text-risk-medium">Fallback: {exec.fallback_reason}</div>}
       <div className="num grid grid-cols-2 gap-x-3 text-muted">
         <span>model {exec.model ?? "—"}</span>
         <span>prompt {exec.prompt_version ?? "—"}</span>
@@ -88,7 +90,7 @@ export function AgentsPanel({ run, events, streamState }: { run: CaseRun | null;
       {run && (
         <ol>
           {GRAPH_NODES.map((n) => {
-            const row = rows.get(n.node) ?? { status: "pending" as const, message: null, latency: null, tokens: 0, exec: null };
+            const row = rows.get(n.node) ?? { status: "pending" as const, message: null, latency: null, tokens: 0, reason: null, exec: null };
             const color = AGENT_COLOR[n.agent];
             const statusColor = row.status === "pending" ? "var(--c-text-muted)" : NODE_STATUS_COLOR[row.status];
             const expanded = open === n.node;
@@ -105,6 +107,7 @@ export function AgentsPanel({ run, events, streamState }: { run: CaseRun | null;
                       {n.agent !== "code" && <span className="rounded px-1 text-[10px] font-semibold uppercase" style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>{AGENT_LABEL[n.agent]}</span>}
                     </span>
                     {row.message && row.status !== "pending" && <span className="block truncate text-[11px] text-muted" title={row.message}>{row.message}</span>}
+                    {row.reason && row.status !== "pending" && <span className="block truncate text-[11px] text-risk-medium" title={row.reason}>Fallback: {row.reason}</span>}
                   </span>
                   <span className="num shrink-0 text-right text-[11px] text-muted">
                     <span className="block" style={{ color: statusColor }}>{row.status}</span>

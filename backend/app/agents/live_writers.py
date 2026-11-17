@@ -18,7 +18,7 @@ from backend.app.agents.critic import code_checks
 from backend.app.agents.narrative import TemplateNarrativeWriter, _ids
 from backend.app.agents.prompts import load_prompt
 from backend.app.agents.schemas import CriticOutput, NarrativeOutput, Sentence
-from backend.app.agents.text import cite
+from backend.app.agents.text import cite, fallback_reason
 from backend.app.core.config_files import AgentModelConfig
 from backend.app.core.errors import LLMUnavailable
 from backend.app.llm.client import LlmClient
@@ -71,7 +71,7 @@ class LiveNarrativeWriter:
         try:
             out, call = await self._client.structured(self._route, self.prompt_version, self._system, user, NarrativeOutput)
         except LLMUnavailable as exc:
-            return base, {**meta, "summary": f"fallback ({type(exc).__name__}): {meta['summary']}"}
+            return base, {**meta, "fallback_reason": fallback_reason(exc), "summary": f"fallback ({type(exc).__name__}): {meta['summary']}"}
         report = self._assemble(out, base, {e["id"] for e in evidence}, disp)
         live = {**call.as_meta(), "fallback_used": False, "summary": f"{len(report['citations'])} citations, {disp}"}
         return report, live
@@ -122,7 +122,7 @@ class LiveCritic:
             out, call = await self._client.structured(self._route, self.prompt_version, self._system, user, CriticOutput)
         except LLMUnavailable as exc:
             result = {"verdict": "revise" if issues else "pass", "issues": issues, "checks": "code"}
-            return result, {"fallback_used": True, "prompt_version": "critic-template-1", "model": "template", "summary": f"fallback ({type(exc).__name__}): {result['verdict']}, {len(issues)} issue(s)"}
+            return result, {"fallback_used": True, "fallback_reason": fallback_reason(exc), "prompt_version": "critic-template-1", "model": "template", "summary": f"fallback ({type(exc).__name__}): {result['verdict']}, {len(issues)} issue(s)"}
         issues += [f"llm: unsupported claim: {c[:120]}" for c in out.unsupported_claims]
         issues += [f"llm: possible tipping-off: {c[:120]}" for c in out.tipping_off]
         if out.followed_untrusted_instruction:

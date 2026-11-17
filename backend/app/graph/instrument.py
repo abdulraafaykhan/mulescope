@@ -2,7 +2,7 @@
 
 ``@node("name", agent="code")`` wraps an async node function. It writes a
 ``node_executions`` row (start, end, latency, tokens, retries, status,
-fallback flag), appends an audit event to the case hash chain and publishes
+fallback flag and reason), appends an audit event to the case hash chain and publishes
 ``{node, status, message, tokens}`` through LangGraph's stream writer, so the
 node bodies stay free of logging code.
 """
@@ -55,7 +55,7 @@ def node(name: str, agent: str = "code") -> Callable[[NodeFn], NodeFn]:
             t0 = time.perf_counter()
             oid = await deps.node_execs.insert({
                 "run_id": run_id, "case_id": case_id, "node": name, "agent": agent, "status": "running",
-                "started_at": started, "created_at": started, "latency_ms": None, "tokens_in": 0, "tokens_out": 0, "retries": 0, "fallback_used": False,
+                "started_at": started, "created_at": started, "latency_ms": None, "tokens_in": 0, "tokens_out": 0, "retries": 0, "fallback_used": False, "fallback_reason": None,
             })
             write({"type": "node", "node": name, "agent": agent, "status": "running", "message": f"{name} started", "tokens": 0})
             with bind_run_context(case_id, run_id):
@@ -76,19 +76,20 @@ def node(name: str, agent: str = "code") -> Callable[[NodeFn], NodeFn]:
             meta = update.pop(META_KEY, {}) if isinstance(update, dict) else {}
             latency = int((time.perf_counter() - t0) * 1000)
             status = "fallback" if meta.get("fallback_used") else "done"
+            reason = meta.get("fallback_reason")
             tokens = int(meta.get("tokens_in", 0)) + int(meta.get("tokens_out", 0))
             await deps.node_execs.update(oid, {
                 "status": status, "latency_ms": latency, "ended_at": deps.clock.now(),
                 "tokens_in": int(meta.get("tokens_in", 0)), "tokens_out": int(meta.get("tokens_out", 0)), "retries": int(meta.get("retries", 0)),
-                "fallback_used": bool(meta.get("fallback_used", False)), "prompt_version": meta.get("prompt_version"), "model": meta.get("model"),
+                "fallback_used": bool(meta.get("fallback_used", False)), "fallback_reason": reason, "prompt_version": meta.get("prompt_version"), "model": meta.get("model"),
                 "output_summary": meta.get("summary"), "tool_calls": meta.get("tool_calls", []), "cache_hit": bool(meta.get("cache_hit", False)),
             })
             await deps.audit.append(
                 ts=deps.clock.now(), actor={"type": "agent" if agent != "code" else "system", "id": name}, event=f"node.{name}.completed",
                 entity={"type": "case_run", "id": run_id or ""}, case_id=case_id, run_id=run_id,
-                payload={"latency_ms": latency, "status": status, "summary": meta.get("summary")},
+                payload={"latency_ms": latency, "status": status, "summary": meta.get("summary"), **({"fallback_reason": reason} if reason else {})},
             )
-            write({"type": "node", "node": name, "agent": agent, "status": status, "message": meta.get("summary") or f"{name} done", "tokens": tokens, "latency_ms": latency})
+            write({"type": "node", "node": name, "agent": agent, "status": status, "message": meta.get("summary") or f"{name} done", "tokens": tokens, "latency_ms": latency, "fallback_reason": reason})
             return update
 
         return wrapper

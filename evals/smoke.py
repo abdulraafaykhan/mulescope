@@ -2,7 +2,8 @@
 
 Runs in-process in the configured LLM mode (fallback by default), auto-approves
 at the analyst gate, and prints the disposition, evidence count, actions
-created and the audit-chain check. Uses the truth database only to pick the
+created, the audit-chain check and, per agent, the model or the fallback
+reason. Uses the truth database only to pick the
 two example cases (allowed for evals).
 """
 
@@ -23,6 +24,19 @@ from backend.app.graph.checkpoint import build_checkpointer
 from backend.app.repositories.mongo.collection_names import OperationalCollection as Col
 
 EXAMPLES = ("mule.classic", "seller.shop")
+
+
+def _agent_label(e: dict[str, Any]) -> str:
+    """``node=llm[model](tok)``, ``node=fallback[reason]`` or ``node=template``.
+
+    Template-mode nodes (LLM_MODE=fallback) have no reason and read ``template``.
+    """
+    tokens = int(e.get("tokens_in") or 0) + int(e.get("tokens_out") or 0)
+    if e.get("fallback_reason"):
+        return f"{e['node']}=fallback[{e['fallback_reason']}]"
+    if e.get("fallback_used"):
+        return f"{e['node']}=template"
+    return f"{e['node']}=llm[{e.get('model')}]({tokens} tok{', cache' if e.get('cache_hit') else ''})"
 
 
 async def run(scenarios: tuple[str, ...], decision: str, mode: str | None) -> None:
@@ -62,12 +76,13 @@ async def run(scenarios: tuple[str, ...], decision: str, mode: str | None) -> No
             chain = await app.audit.verify_chain(case["_id"])
             print(f"\n{scenario}  case {case['_id']}  account {gt['account_id']}  run {run_id}")
             print(f"  expected {gt['expected_disposition']}  recommended {final_case.get('recommended_disposition')}  final {final_case.get('final_disposition')}  score {final_case.get('score')}  case status {final_case.get('status')}")
-            print(f"  run status {run.get('status')}  investigate {t_investigate:.1f}s  total {time.perf_counter() - t0:.1f}s  nodes latency {run.get('totals', {}).get('latency_ms')} ms")
+            execs = [e for e in await app.deps.node_execs.for_run(run_id) if e.get("agent") != "code"]
+            fallback_nodes = sum(1 for e in execs if e.get("fallback_reason"))
+            print(f"  run status {run.get('status')}  investigate {t_investigate:.1f}s  total {time.perf_counter() - t0:.1f}s  nodes latency {run.get('totals', {}).get('latency_ms')} ms  fallback nodes {fallback_nodes}")
             print(f"  evidence {len(evidence)}  report v{report.get('version')} critic {(report.get('critic') or {}).get('verdict')}  citations {len(report.get('citations') or [])}")
             print(f"  actions {len(actions)}: " + ", ".join(f"{a['type']}={a['status']}" for a in actions))
             print(f"  audit chain valid={chain['valid']} records={chain['records']}")
-            execs = [e for e in await app.deps.node_execs.for_run(run_id) if e.get("agent") != "code"]
-            print("  agents: " + ", ".join(f"{e['node']}={'fallback' if e.get('fallback_used') else 'llm'}({int(e.get('tokens_in') or 0) + int(e.get('tokens_out') or 0)} tok{', cache' if e.get('cache_hit') else ''})" for e in execs))
+            print("  agents: " + ", ".join(_agent_label(e) for e in execs))
             if (report.get("critic") or {}).get("issues"):
                 print("  critic issues: " + "; ".join(report["critic"]["issues"])[:400])
     finally:

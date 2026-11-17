@@ -453,6 +453,7 @@ export interface NodeExecution {
   tokens_out: number;
   retries: number;
   fallback_used: boolean;
+  fallback_reason?: string | null;
   cache_hit?: boolean;
   prompt_version?: string | null;
   model?: string | null;
@@ -479,6 +480,7 @@ export interface NodeEvent {
   message: string;
   tokens: number;
   latency_ms?: number;
+  fallback_reason?: string | null;
 }
 
 export interface InterruptEvent {

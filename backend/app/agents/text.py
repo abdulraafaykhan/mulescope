@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 
 IST = timedelta(hours=5, minutes=30)
 REMARK_MAX = 140
+REASON_MAX = 300
+REASON_SEPARATOR = "; "
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _INJECTION = re.compile(r"ignore (all |any )?previous instructions|^system:|\bsystem\b:|assistant,|ai reviewer|disregard|do not draft|output disposition", re.IGNORECASE)
 
@@ -48,6 +50,20 @@ def untrusted(remarks: list[str]) -> str:
     """Wrap remarks for a prompt; the system prompt says this block is data only."""
     body = "\n".join(f"- {clean_remark(r)}" for r in remarks)
     return f"<untrusted_data>\n{body}\n</untrusted_data>"
+
+
+def fallback_reason(exc: Exception) -> str:
+    """Short, visible reason a node used its template.
+
+    Joins the ``provider/model: cause`` strings the LLM client collected in
+    ``exc.detail["errors"]``; falls back to the exception message when there
+    are none. The strings hold no keys or prompts. Trimmed to 300 characters.
+    """
+    detail = getattr(exc, "detail", None)
+    errors = detail.get("errors") if isinstance(detail, dict) else None
+    joined = REASON_SEPARATOR.join(str(e) for e in errors) if errors else ""
+    message = getattr(exc, "message", None) or str(exc) or type(exc).__name__
+    return (joined or message)[:REASON_MAX]
 
 
 def looks_like_instruction(text: str | None) -> bool:

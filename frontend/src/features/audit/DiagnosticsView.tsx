@@ -22,14 +22,22 @@ export function DiagnosticsView({ runId, runActive }: { runId: string | null; ru
   const span = Math.max(1, tEnd - t0);
   const retries = nodes.reduce((s, n) => s + n.retries, 0);
   const errors = nodes.filter((n) => n.status === "error").length;
+  const reasons = nodes.filter((n) => n.fallback_reason);
   const llmNodes = nodes.filter((n) => n.agent !== "code" && !n.fallback_used);
   const wall = run.ended_at ? new Date(run.ended_at).getTime() - new Date(run.started_at).getTime() : null;
 
   return (
     <div className="flex h-full flex-col">
       {fallback && (
-        <div className="flex shrink-0 items-center gap-2 border-b border-risk-medium/40 bg-risk-medium/10 px-3 py-1.5 text-xs text-risk-medium" role="status">
-          <AlertTriangle size={13} aria-hidden /> {nodes.filter((n) => n.fallback_used).length} node(s) used the template fallback (LLM mode {run.llm_mode}).
+        <div className="shrink-0 border-b border-risk-medium/40 bg-risk-medium/10 px-3 py-1.5 text-xs text-risk-medium" role="status">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={13} aria-hidden /> {nodes.filter((n) => n.fallback_used).length} node(s) used the template fallback (LLM mode {run.llm_mode}).
+          </div>
+          {reasons.length > 0 && (
+            <ul className="mt-1 space-y-0.5 pl-5">
+              {reasons.map((n) => <li key={n.id} className="num break-words"><span className="font-semibold">{n.node}:</span> {n.fallback_reason}</li>)}
+            </ul>
+          )}
         </div>
       )}
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_280px_280px] gap-4 overflow-hidden p-3">
@@ -40,7 +48,7 @@ export function DiagnosticsView({ runId, runActive }: { runId: string | null; ru
               const left = ((new Date(n.started_at).getTime() - t0) / span) * 100;
               const width = Math.max(0.6, ((n.latency_ms ?? 0) / span) * 100);
               return (
-                <li key={n.id} className="grid grid-cols-[130px_1fr_64px] items-center gap-2 text-[11px]">
+                <li key={n.id} title={n.fallback_reason ?? undefined} className="grid grid-cols-[130px_1fr_64px] items-center gap-2 text-[11px]">
                   <span className="truncate text-secondary">{n.node}</span>
                   <span className="relative h-2.5 rounded bg-elevated">
                     <span className="absolute top-0 h-full rounded" style={{ left: `${left}%`, width: `${width}%`, background: AGENT_COLOR[n.agent], opacity: n.fallback_used ? 0.6 : 1 }} />

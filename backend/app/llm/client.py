@@ -99,7 +99,8 @@ class LlmClient:
         meta = CallMeta(model=route.model, prompt_version=prompt_version)
         provider = self._providers.get(route.provider.value)
         if provider is None:
-            raise LLMUnavailable(f"{route.provider.value}/{route.model}: provider is not configured")
+            reason = f"{route.provider.value}/{route.model}: provider is not configured"
+            raise LLMUnavailable(reason, detail={"errors": [reason]})
         budget = self._limits.node_budget_seconds
         try:
             async with asyncio.timeout(budget) as scope:

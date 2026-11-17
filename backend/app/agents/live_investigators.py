@@ -16,7 +16,7 @@ from backend.app.agents.flow_analyst import TemplateFlowAnalyst
 from backend.app.agents.profiler import TemplateProfiler
 from backend.app.agents.prompts import load_prompt
 from backend.app.agents.schemas import FlowOutput, ProfilerOutput
-from backend.app.agents.text import untrusted
+from backend.app.agents.text import fallback_reason, untrusted
 from backend.app.agents.tools.flow_tools import FlowTools
 from backend.app.core.config_files import AgentModelConfig
 from backend.app.core.errors import LLMUnavailable
@@ -33,8 +33,9 @@ def _facts_block(facts: list[dict[str, Any]]) -> str:
 
 
 def _fallback(meta: dict[str, Any], exc: Exception) -> dict[str, Any]:
-    _logger.warning("agent fell back to template", extra={"error": str(exc)[:200]})
-    return {**meta, "fallback_used": True, "summary": f"fallback ({type(exc).__name__}): {meta.get('summary', '')}"[:300]}
+    reason = fallback_reason(exc)
+    _logger.warning("agent fell back to template", extra={"error": reason})
+    return {**meta, "fallback_used": True, "fallback_reason": reason, "summary": f"fallback ({type(exc).__name__}): {meta.get('summary', '')}"[:300]}
 
 
 def _live_meta(base: dict[str, Any], call: Any, summary: str) -> dict[str, Any]:
