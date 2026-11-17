@@ -42,7 +42,8 @@ class TemplateNarrativeWriter:
         signal_ids = [e["id"] for e in evidence if e["kind"] == "signal" and e.get("data", {}).get("fired") and e.get("data", {}).get("kind") == "risk"]
         mitigator_ids = [e["id"] for e in evidence if e["kind"] == "signal" and e.get("data", {}).get("fired") and e.get("data", {}).get("kind") == "mitigator"]
         period = f"{ist(window['start'])} to {ist(window['end'])}"
-        m = {k: by_key[k]["data"].get("value") for k in by_key if k.startswith("metric:")}
+        # Keys are stored as "metric:<name>"; the template reads them by bare name.
+        m = {k.removeprefix("metric:"): by_key[k]["data"].get("value") for k in by_key if k.startswith("metric:")}
 
         summary = [
             "## Executive summary",
