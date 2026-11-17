@@ -64,16 +64,26 @@ Frontend (`frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
 - `eval_results` store the scenario name, label and expected disposition so the Evals page can show per-scenario pass/fail. They are written only by the CLI, and no agent tool reads that collection. This deviates from "no answers inside" for eval results; the truth database stays the only source of labels.
 - README states that the weights were tuned on the seed-42 alerts (in-sample), that seed 7 is a synthetic-to-synthetic check, and that three mules scoring 65, 65 and 68 reach STR only through the caution band.
 - LLM transport: Groq (OpenAI-compatible chat, `response_format: json_object`) and Gemini (`generateContent`, `responseMimeType: application/json`) over `httpx` (pinned 0.28.1, already in the lock through langchain-core), instead of two vendor SDKs. Structured output = JSON mode + Pydantic validation + one repair retry, not `with_structured_output` (no LangChain chat-model packages in the stack).
-- Models (`config/llm.yaml`, TODO verify): Groq `openai/gpt-oss-20b` for profiler, flow analyst and critic (Groq retired the Llama 3.x self-serve models in Aug 2026); Gemini `gemini-3.8-flash` for the narrative. Both checked on the providers' model pages in Nov 2026.
+- Models (`config/llm.yaml`, TODO verify): Groq `openai/gpt-oss-20b` for profiler, flow analyst and critic (Groq retired the Llama 3.x self-serve models in Aug 2026). The narrative was first on Gemini `gemini-3.8-flash`; see the live mode decisions below. Checked on the providers' model pages in Nov 2026.
 - Live agents wrap their templates: the template computes the deterministic facts (and runs the bounded tool calls for the flow analyst; the LLM does not choose tools), then the LLM adds one cited assessment fact and a structured finding. Any `LLMUnavailable` returns the template output with `fallback_used=true`. In live mode, an agent whose provider has no key stays template.
 - Narrative guards in code: evidence ids not in the ledger are dropped, uncited sentences are dropped, the risk score / typologies / disposition line / actions come from the template (so the stated disposition always equals the policy), the STR draft falls back to the template if any required section is missing, and a customer letter containing a tipping-off term is replaced by the neutral template.
 - Cache key = sha256(model, prompt version, system, user); `_id` of `llm_cache` is the key (TTL 30 days). `node_executions.cache_hit` feeds the diagnostics cache hit rate.
 - Prompts: `agents/prompts/<agent>.v1.md`; the version (file stem) is stamped on runs, node executions and cache keys. Run documents now take `prompt_versions` / `models` from the active agent suite.
 - `uv run smoke --mode live` and `uv run evals --mode live --resume` pass the keys through; `LLM_MODE=live` in `.env` switches the API.
 - CORS: `CORS_ORIGINS` (JSON list) already defaulted to `http://localhost:5173` and `http://127.0.0.1:5173`; now documented in `.env.example` with `VITE_API_URL`.
+- Live mode fixes: the narrative runs on Groq `openai/gpt-oss-120b` with fallback model `openai/gpt-oss-20b`. Gemini is unreachable from this machine (3.8-flash and 3.7-flash time out after 20 s, 3.6-flash returns 503). Switch back per agent in `config/llm.yaml` with `provider: gemini`, no code change.
+- LLM limits in `config/llm.yaml`: 20 s per call (`call_timeout_seconds`), 2 attempts (`max_attempts`), 40 s per node (`node_budget_seconds`). A node makes one structured call, so the budget covers all attempts, the fallback model and the repair.
+- No same-model retry after a timeout. A `Retry-After` longer than `backoff_max_seconds` moves to the fallback model instead of waiting.
+- `fallback_reason` (provider, model and cause) is recorded in `node_executions`, the audit payload, the SSE node event, the smoke output and the UI (Diagnostics and Agents panel).
+- Stale action ids on a re-run are fixed by refreshing proposed actions (`refresh_proposed` sets `run_id` and `evidence_ids`) and by mapping the actions given to the narrative onto the current ledger (`with_current_evidence`). The run id is not in the idempotency key: it would create duplicate proposed actions, and `execute_actions` runs every proposed or approved action of the case, so a hold could run twice.
+- `strip_unknown_ids` removes `EVD-` ids that are not in the ledger from template and live narrative text.
+- Template narrative amounts fixed: the metric keys are prefixed `metric:`, and the template now strips the prefix, so it shows the real credits and debits instead of ₹0.
 
 ## Known gaps
 
+- An action cancelled or rejected in an earlier run still blocks a new proposal for the same key (the idempotency key is `case:type:target`).
+- Stored executed actions keep their first-run evidence ids. History is not rewritten, only the copy given to the narrative is mapped to the current ledger.
+- The node budget is a wall-clock limit on one structured call, not on the whole node including code and tool work.
 - Live LLM calls are unverified against the real Groq and Gemini APIs (no keys). The request/response mapping follows the public API shapes; the first live smoke may need small fixes, which fall back to templates meanwhile.
 - The flow analyst does not run an LLM-driven tool loop: the four read-only tools are called by code, and the LLM interprets the results.
 - No separate token-bucket rate limiter: the semaphore of 2 plus backoff honouring `Retry-After` is the only quota protection. A full live eval may still need several `--resume` sessions.
