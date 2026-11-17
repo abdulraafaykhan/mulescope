@@ -19,6 +19,9 @@ dependencies = [
     # Section 2: synthetic data with Faker (en_IN) and NumPy, seeded RNG.
     "faker==40.54.0",
     "numpy==2.5.5",
+    # Section 2: Groq and Gemini clients. Both are plain HTTPS JSON APIs, so one HTTP
+    # client (already in the lock through langchain-core) replaces two vendor SDKs.
+    "httpx==0.28.1",
 ]
 
 [dependency-groups]
@@ -28,9 +31,6 @@ dev = [
     "ruff==0.17.5",
     "mypy==2.4.1",
     "pre-commit==4.7.0",
-    # Dev-only: FastAPI's TestClient / httpx.ASGITransport need it and plain `fastapi`
-    # does not pull it in. Never imported by app code.
-    "httpx==0.28.1",
 ]
 
 [project.scripts]

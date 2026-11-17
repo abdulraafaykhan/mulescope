@@ -91,7 +91,10 @@ class Container:
         await wire(self)
 
     async def shutdown(self) -> None:
-        """Close both Mongo clients."""
+        """Close the LLM HTTP clients and both Mongo clients."""
+        app = self.extras.get("app")
+        if app is not None:
+            await app.deps.agents.aclose()
         if self._client is not None:
             await self._client.close()
         if self._sync_client is not None:

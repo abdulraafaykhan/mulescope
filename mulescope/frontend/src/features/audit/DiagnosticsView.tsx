@@ -22,6 +22,7 @@ export function DiagnosticsView({ runId, runActive }: { runId: string | null; ru
   const span = Math.max(1, tEnd - t0);
   const retries = nodes.reduce((s, n) => s + n.retries, 0);
   const errors = nodes.filter((n) => n.status === "error").length;
+  const llmNodes = nodes.filter((n) => n.agent !== "code" && !n.fallback_used);
   const wall = run.ended_at ? new Date(run.ended_at).getTime() - new Date(run.started_at).getTime() : null;
 
   return (
@@ -62,7 +63,7 @@ export function DiagnosticsView({ runId, runActive }: { runId: string | null; ru
             <Fact label="Run wall time" mono>{ms(wall)}</Fact>
             <Fact label="Retries" mono>{retries}</Fact>
             <Fact label="Failures" mono>{errors}</Fact>
-            <Fact label="Cache hit rate" mono>{run.llm_mode === "fallback" ? "n/a (fallback)" : "—"}</Fact>
+            <Fact label="Cache hit rate" mono>{llmNodes.length ? `${llmNodes.filter((n) => n.cache_hit).length} / ${llmNodes.length} LLM calls` : "n/a (no LLM calls)"}</Fact>
           </div>
         </div>
         <div className="min-h-0 overflow-y-auto">

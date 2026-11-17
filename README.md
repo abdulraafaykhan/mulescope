@@ -54,7 +54,9 @@ Every node is wrapped by one decorator that writes a `node_executions` row, appe
 - **Analyst UI**: alert queue with KPIs and filters; case workspace with the sender / flagged account / receiver strip, score breakdown, evidence list, React Flow money-flow graph with a replay slider, timeline, virtualised transactions, report with EVD citation chips, live agent stepper over SSE, per-action approve / reject / reverse, audit log with hash-chain badge, diagnostics drawer and an account drawer; Evals page.
 - **Eval harness**: `uv run evals --mode fallback|live` runs all 40 alerts end to end, resumable.
 
-Agent text is generated from deterministic templates (`LLM_MODE=fallback`), so a run needs no LLM keys and takes about 3 seconds. Live Groq / Gemini agents are the next phase (see `PROGRESS.md`).
+- **LLM agents**: with `LLM_MODE=live` and keys set, the Profiler, Flow Analyst and Critic call Groq and the Narrative Writer calls Gemini Flash. Models are set in `config/llm.yaml`. Calls use JSON output validated by Pydantic with one repair retry, temperature 0, retry with backoff, a global semaphore of 2 and an `llm_cache` collection. Transaction remarks are wrapped in `<untrusted_data>`. Every agent falls back to its deterministic template on any failure, so a run never fails because of an LLM.
+
+With `LLM_MODE=fallback` (the default) every agent uses its template, so a run needs no keys and takes about 3 seconds. The live path has not yet been exercised against the real APIs (see `PROGRESS.md`).
 
 ## Setup (PowerShell)
 
@@ -91,6 +93,7 @@ In the UI: open a case from the queue, press **Start investigation**, watch the 
 | `uv run seed --preview ACC-123456` | Print one account's 14-day story |
 | `uv run check-policy` | Expected vs predicted disposition for the 40 planted alerts (code only) |
 | `uv run smoke` | One mule and one seller through the full graph with auto-approve |
+| `uv run smoke --mode live` | The same with Groq / Gemini (needs `GROQ_API_KEY`, `GEMINI_API_KEY`) |
 | `uv run evals --mode fallback` | All 40 alerts through the graph; results on the Evals page |
 | `uv run evals --mode live --resume` | Continue the latest unfinished live eval run, skipping evaluated cases |
 | `uv run dev` | Start the API |

@@ -81,7 +81,7 @@ def node(name: str, agent: str = "code") -> Callable[[NodeFn], NodeFn]:
                 "status": status, "latency_ms": latency, "ended_at": deps.clock.now(),
                 "tokens_in": int(meta.get("tokens_in", 0)), "tokens_out": int(meta.get("tokens_out", 0)), "retries": int(meta.get("retries", 0)),
                 "fallback_used": bool(meta.get("fallback_used", False)), "prompt_version": meta.get("prompt_version"), "model": meta.get("model"),
-                "output_summary": meta.get("summary"), "tool_calls": meta.get("tool_calls", []),
+                "output_summary": meta.get("summary"), "tool_calls": meta.get("tool_calls", []), "cache_hit": bool(meta.get("cache_hit", False)),
             })
             await deps.audit.append(
                 ts=deps.clock.now(), actor={"type": "agent" if agent != "code" else "system", "id": name}, event=f"node.{name}.completed",

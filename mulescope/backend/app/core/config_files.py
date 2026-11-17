@@ -37,6 +37,7 @@ __all__ = [
     "AgentModelConfig",
     "AgentsConfig",
     "CacheConfig",
+    "LimitsConfig",
     "LlmConfig",
     "LlmProvider",
     "ProviderConfig",
@@ -76,6 +77,7 @@ class ProviderConfig(_ConfigModel):
     """
 
     default_model: str = Field(min_length=1)
+    base_url: str = Field(min_length=1)
 
 
 class ProvidersConfig(_ConfigModel):
@@ -102,6 +104,7 @@ class AgentModelConfig(_ConfigModel):
     provider: LlmProvider
     model: str = Field(min_length=1)
     temperature: float | None = Field(default=None, ge=0)
+    max_tokens: int = Field(default=1500, gt=0)
 
 
 class AgentsConfig(_ConfigModel):
@@ -130,6 +133,26 @@ class CacheConfig(_ConfigModel):
     ttl_days: int = Field(gt=0)
 
 
+class LimitsConfig(_ConfigModel):
+    """Free-tier protection: concurrency, timeouts and retry policy.
+
+    Attributes:
+        max_concurrency: Global semaphore size across all LLM calls.
+        timeout_seconds: Per-request HTTP timeout.
+        max_retries: Retries on rate limits, timeouts and 5xx before falling back.
+        backoff_base_seconds: First backoff delay; doubles per retry.
+        backoff_max_seconds: Upper bound for one backoff delay.
+        repair_attempts: Extra calls when the output fails schema validation.
+    """
+
+    max_concurrency: int = Field(default=2, gt=0)
+    timeout_seconds: float = Field(default=60, gt=0)
+    max_retries: int = Field(default=3, ge=0)
+    backoff_base_seconds: float = Field(default=2, ge=0)
+    backoff_max_seconds: float = Field(default=30, ge=0)
+    repair_attempts: int = Field(default=1, ge=0)
+
+
 class LlmConfig(_ConfigModel):
     """Validated contents of ``config/llm.yaml``.
 
@@ -143,6 +166,7 @@ class LlmConfig(_ConfigModel):
     version: str = Field(min_length=1)
     providers: ProvidersConfig
     agents: AgentsConfig
+    limits: LimitsConfig = LimitsConfig()
     cache: CacheConfig
 
     @property

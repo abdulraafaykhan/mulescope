@@ -453,6 +453,7 @@ export interface NodeExecution {
   tokens_out: number;
   retries: number;
   fallback_used: boolean;
+  cache_hit?: boolean;
   prompt_version?: string | null;
   model?: string | null;
   output_summary?: string | null;

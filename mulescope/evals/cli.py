@@ -18,7 +18,7 @@ from pymongo import AsyncMongoClient, MongoClient
 
 from backend.app.core.logging import configure_logging
 from backend.app.core.settings import EvalsSettings
-from backend.app.core.wiring import build_app_objects
+from backend.app.core.wiring import build_app_objects, secret
 from backend.app.domain.enums import LlmMode
 from backend.app.graph.checkpoint import build_checkpointer
 from evals.harness import EvalHarness
@@ -56,12 +56,15 @@ async def run(mode: str, resume: str | None, limit: int | None) -> None:
             print("no ground truth found; run: uv run seed --seed 42 --customers 300 --reset")
             return
         saver = await asyncio.to_thread(build_checkpointer, sync_client, s.mongo_db_name, s.checkpoint_ttl_seconds)
-        app = build_app_objects(db, saver, config_dir=s.config_dir, graph_version=s.graph_version, llm_mode=s.llm_mode.value)
-        harness = EvalHarness(app, db, truth)
-        run_id, done = await harness.open_run(mode, resume, s.graph_version)
-        print(f"eval run {run_id}  mode {mode}  {len(truth)} planted alerts, {len(done)} already evaluated", flush=True)
-        results = await harness.evaluate(run_id, done, _print_result)
-        _print_summary(run_id, await harness.close_run(run_id, results))
+        app = build_app_objects(db, saver, config_dir=s.config_dir, graph_version=s.graph_version, llm_mode=s.llm_mode.value, groq_key=secret(s.groq_api_key), gemini_key=secret(s.gemini_api_key))
+        try:
+            harness = EvalHarness(app, db, truth)
+            run_id, done = await harness.open_run(mode, resume, s.graph_version)
+            print(f"eval run {run_id}  mode {mode}  agents {app.deps.agents.models}  {len(truth)} planted alerts, {len(done)} already evaluated", flush=True)
+            results = await harness.evaluate(run_id, done, _print_result)
+            _print_summary(run_id, await harness.close_run(run_id, results))
+        finally:
+            await app.deps.agents.aclose()
     finally:
         await client.close()
         await truth_client.close()

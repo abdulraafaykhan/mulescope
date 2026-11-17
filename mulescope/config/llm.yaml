@@ -1,45 +1,61 @@
-# MuleScope LLM configuration (M0 placeholder).
+# MuleScope LLM configuration (build prompt sections 2 and 7).
 #
 # Loaded by backend/app/core/config_files.py into LlmConfig. Model names,
-# temperatures and cache retention live here, never as literals in code
-# (build prompt section 10.2). Real model choices are made when the LLM
-# provider layer is implemented.
+# temperatures, token limits, timeouts and retry policy live here, never as
+# literals in code. Keys come from the environment only (GROQ_API_KEY,
+# GEMINI_API_KEY); never put keys in this file.
+#
+# Groq runs the Profiler, Flow Analyst and Critic on its small model; Gemini
+# Flash runs only the Narrative Writer. Any failure falls back to the node's
+# template implementation, so a run never fails because of an LLM.
 
-version: "0.1.0"
+version: "1.0.0"
 
-# Provider connection keys come from the environment only
-# (GROQ_API_KEY, GEMINI_API_KEY). Never put keys in this file.
 providers:
   groq:
-    # TODO verify: pick the Groq model when the provider layer is built.
-    default_model: "TODO-groq-model"
+    # TODO verify: Groq retired llama-3.1-8b-instant / llama-3.3-70b-versatile for
+    # self-serve accounts in Aug 2026; openai/gpt-oss-20b is listed as a production
+    # model on console.groq.com/docs/models (checked Nov 2026).
+    default_model: "openai/gpt-oss-20b"
+    base_url: "https://api.groq.com/openai/v1"
   gemini:
-    # TODO verify: pick the Gemini model when the provider layer is built.
-    default_model: "TODO-gemini-model"
+    # TODO verify: gemini-3.8-flash is listed as stable on the Gemini API models page
+    # (checked Nov 2026). Check the free-tier limits of your project.
+    default_model: "gemini-3.8-flash"
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
 
-# Per-agent model routing. Each agent names a primary provider and model,
-# plus a temperature. All values are placeholders until the agents exist.
-# The provider split comes from build prompt section 2: Groq runs the
-# Profiler, Flow Analyst and Critic, Gemini Flash runs only the Narrative
-# Writer. The small model is for routing and critique, the larger one only
-# for the narrative.
 agents:
   profiler:
     provider: groq
-    model: "TODO-groq-model"
-    temperature: null # TODO verify: set when the agent is implemented
+    model: "openai/gpt-oss-20b"
+    temperature: 0
+    max_tokens: 1500
   flow_analyst:
     provider: groq
-    model: "TODO-groq-model"
-    temperature: null # TODO verify: set when the agent is implemented
+    model: "openai/gpt-oss-20b"
+    temperature: 0
+    max_tokens: 1500
   narrative_writer:
     provider: gemini
-    model: "TODO-gemini-model"
-    temperature: null # TODO verify: set when the agent is implemented
+    model: "gemini-3.8-flash"
+    temperature: 0
+    # Thinking tokens count against the output budget on Gemini 3.x models.
+    max_tokens: 6000
   critic:
     provider: groq
-    model: "TODO-groq-model"
-    temperature: null # TODO verify: set when the agent is implemented
+    model: "openai/gpt-oss-20b"
+    temperature: 0
+    max_tokens: 1200
+
+# Free-tier protection: one global semaphore across all agents.
+limits:
+  max_concurrency: 2
+  timeout_seconds: 60
+  max_retries: 3
+  backoff_base_seconds: 2
+  backoff_max_seconds: 30
+  # One repair attempt when the output does not match the schema, then fall back.
+  repair_attempts: 1
 
 # Response cache. ttl_days is the source of the llm_cache created_at TTL index.
 cache:

@@ -52,8 +52,7 @@ class CaseRunner:
         run_id = (await deps.counters.next_ids("runs", "RUN-", 1, now, width=5))[0]
         doc = {
             "_id": run_id, "case_id": case_id, "thread_id": run_id, "graph_version": self._graph_version,
-            "prompt_versions": {"profiler": "template-1", "flow_analyst": "template-1", "narrative": "template-1", "critic": "template-1"},
-            "models": {"profiler": "template", "flow_analyst": "template", "narrative": "template", "critic": "template"} if self._llm_mode == "fallback" else {},
+            "prompt_versions": dict(deps.agents.prompt_versions), "models": dict(deps.agents.models),
             "dataset_seed": self._seed, "llm_mode": self._llm_mode, "status": "running", "started_at": now, "ended_at": None,
             "totals": {"tokens": 0, "latency_ms": 0, "retries": 0}, "created_at": now,
         }

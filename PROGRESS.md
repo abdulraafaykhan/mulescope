@@ -3,7 +3,7 @@
 Checklist of build phases. If context is lost, continue from the first unchecked item.
 Source of truth for stack, data model, graph, scoring and UI: `docs/BUILD_PROMPT.md`.
 Process, testing and scope follow the latest user instructions (no specs, no test suites,
-smoke commands only, commit after each phase). This run stopped after phase 3 as asked.
+smoke commands only, commit after each phase). Phases were built in the order 5, 6, 4 as asked.
 
 ## Phases
 
@@ -11,7 +11,7 @@ smoke commands only, commit after each phase). This run stopped after phase 3 as
 - [x] Phase 1: synthetic data and detector. Smoke: all 40 planted accounts alerted, 0 organic, seed ~55-70 s on Atlas.
 - [x] Phase 2: domain logic. Smoke: `uv run check-policy` 40/40 (100%), 0 mules closed.
 - [x] Phase 3: API and graph in fallback mode. Smoke: `uv run smoke` mule -> STR draft, seller -> Close, ~3 s per run, audit chains valid; resume after API restart verified.
-- [ ] Phase 4: live LLM agents (Groq/Gemini provider, cache, limiter, prompts, structured output). Keys in `.env` are empty, so fallback stays on.
+- [x] Phase 4: live LLM agents (Groq/Gemini providers, `llm_cache`, semaphore of 2, retry with backoff, schema repair, versioned prompts, per-node template fallback, critic code + LLM checks). Smoke: an offline check with a fake provider passed (429 retry, cache hit, invalid output -> template fallback, narrative guards, critic). `uv run smoke --mode live` was not run: no `.env` / Mongo and no Groq or Gemini key in this clone, so fallback stays on.
 - [x] Phase 5: analyst UI (React + Vite + TS, queue, case workspace, flow graph, agents stepper over SSE, actions, audit, diagnostics). Smoke: `npm run build` passes (tsc clean). Not yet clicked through against a live API: this clone has no `.env`, so the API cannot reach Mongo (see Known gaps).
 - [x] Phase 6: `uv run evals --mode fallback|live` (harness, resumable with `--resume`), Evals page, README. Smoke: CLI imports and `--help` parse. Not yet run end to end, because there is no `.env` / Mongo in this clone. First command once the `.env` is back: `uv run evals --mode fallback`.
 
@@ -61,10 +61,20 @@ Frontend (`mulescope/frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
 - Evals metrics: predicted is the case's policy disposition after the run. Citation validity is cited ids that exist in the run's evidence divided by all cited ids. Claim coverage uses the critic's claim-line rule. Fallback rate counts LLM-agent nodes that used the template. Latency is harness wall time per case, including the auto-approve resume.
 - `eval_results` store the scenario name, label and expected disposition so the Evals page can show per-scenario pass/fail. They are written only by the CLI, and no agent tool reads that collection. This deviates from "no answers inside" for eval results; the truth database stays the only source of labels.
 - README states that the weights were tuned on the seed-42 alerts (in-sample), that seed 7 is a synthetic-to-synthetic check, and that three mules scoring 65, 65 and 68 reach STR only through the caution band.
+- LLM transport: Groq (OpenAI-compatible chat, `response_format: json_object`) and Gemini (`generateContent`, `responseMimeType: application/json`) over `httpx` (pinned 0.28.1, already in the lock through langchain-core), instead of two vendor SDKs. Structured output = JSON mode + Pydantic validation + one repair retry, not `with_structured_output` (no LangChain chat-model packages in the stack).
+- Models (`config/llm.yaml`, TODO verify): Groq `openai/gpt-oss-20b` for profiler, flow analyst and critic (Groq retired the Llama 3.x self-serve models in Aug 2026); Gemini `gemini-3.8-flash` for the narrative. Both checked on the providers' model pages in Nov 2026.
+- Live agents wrap their templates: the template computes the deterministic facts (and runs the bounded tool calls for the flow analyst; the LLM does not choose tools), then the LLM adds one cited assessment fact and a structured finding. Any `LLMUnavailable` returns the template output with `fallback_used=true`. In live mode, an agent whose provider has no key stays template.
+- Narrative guards in code: evidence ids not in the ledger are dropped, uncited sentences are dropped, the risk score / typologies / disposition line / actions come from the template (so the stated disposition always equals the policy), the STR draft falls back to the template if any required section is missing, and a customer letter containing a tipping-off term is replaced by the neutral template.
+- Cache key = sha256(model, prompt version, system, user); `_id` of `llm_cache` is the key (TTL 30 days). `node_executions.cache_hit` feeds the diagnostics cache hit rate.
+- Prompts: `agents/prompts/<agent>.v1.md`; the version (file stem) is stamped on runs, node executions and cache keys. Run documents now take `prompt_versions` / `models` from the active agent suite.
+- `uv run smoke --mode live` and `uv run evals --mode live --resume` pass the keys through; `LLM_MODE=live` in `.env` switches the API.
 - CORS: `CORS_ORIGINS` (JSON list) already defaulted to `http://localhost:5173` and `http://127.0.0.1:5173`; now documented in `.env.example` with `VITE_API_URL`.
 
 ## Known gaps
 
+- Live LLM calls are unverified against the real Groq and Gemini APIs (no keys). The request/response mapping follows the public API shapes; the first live smoke may need small fixes, which fall back to templates meanwhile.
+- The flow analyst does not run an LLM-driven tool loop: the four read-only tools are called by code, and the LLM interprets the results.
+- No separate token-bucket rate limiter: the semaphore of 2 plus backoff honouring `Retry-After` is the only quota protection. A full live eval may still need several `--resume` sessions.
 - This clone has no `.env` (neither `mulescope/.env` nor the workspace `.env`), so `uv run dev` fails on the missing `MONGO_URI` and nothing could be checked against the live Atlas data. The UI types were checked against the backend code that builds each response, not against captured responses. Restore the `.env` and click through once.
 - UI not built: light theme, keyboard shortcuts, Playwright, generated OpenAPI types (all skipped by instruction); the Audit explorer and Settings screens; PAN/account "reveal on click" (the API only ever returns masked values). The diagnostics cache hit rate shows "n/a" until the LLM cache exists.
 - Sender cards show party type and count, not sender account age and KYC type, because the entity strip read model does not carry them for external parties.

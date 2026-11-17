@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = "==3.12.*"
 
 [[package]]
@@ -579,6 +579,7 @@ source = { editable = "." }
 dependencies = [
     { name = "faker" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "langgraph" },
     { name = "langgraph-checkpoint-mongodb" },
     { name = "numpy" },
@@ -591,7 +592,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -603,6 +603,7 @@ dev = [
 requires-dist = [
     { name = "faker", specifier = "==40.54.0" },
     { name = "fastapi", specifier = "==0.163.1" },
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "langgraph", specifier = "==1.2.22" },
     { name = "langgraph-checkpoint-mongodb", specifier = "==0.5.1" },
     { name = "numpy", specifier = "==2.5.5" },
@@ -615,7 +616,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = "==0.28.1" },
     { name = "mypy", specifier = "==2.4.1" },
     { name = "pre-commit", specifier = "==4.7.0" },
     { name = "pytest", specifier = "==9.2.0" },
