@@ -94,7 +94,9 @@ export default function MoneyFlow({ caseId }: { caseId: string }) {
         label: `${e.count}×${e.exit_minutes != null ? ` · ${minutes(e.exit_minutes)}` : ""}`,
         labelStyle: { fontSize: 11, fill: "var(--c-text-secondary)" },
         style: { stroke: color, strokeWidth: 1 + (e.amount / maxAmount) * 7, opacity: dim ? 0.12 : 0.85 },
-        markerEnd: { type: MarkerType.ArrowClosed, color },
+        // Fixed-size arrowheads: by default they scale with stroke width, which
+        // makes the biggest outflow edge end in an oversized blob.
+        markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16, markerUnits: "userSpaceOnUse" },
         animated: !dim && e.exit_minutes != null && e.exit_minutes < 30,
       };
     });
@@ -138,17 +140,22 @@ export default function MoneyFlow({ caseId }: { caseId: string }) {
           {anyExpanded && <MiniMap pannable zoomable position="top-right" nodeColor={(n) => `var(--c-role-${(n as AccountFlowNode).data.flow.role})`} maskColor="rgba(11,15,26,0.7)" />}
         </ReactFlow>
       </div>
-      <div className="flex shrink-0 items-center gap-3 border-t border-line px-3 py-2">
-        <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-secondary">
+      {/* Two rows: the centre column is too narrow at 1440 px for slider and legend side by side. */}
+      <div className="shrink-0 space-y-1 border-t border-line px-3 py-1.5">
+        <label className="flex items-center gap-2 text-xs text-secondary">
           Replay
           <input type="range" min={0} max={SLIDER_STEPS} value={step} onChange={(e) => setStep(Number(e.target.value))} className="min-w-0 flex-1 accent-[var(--c-accent)]" aria-label="Replay the alert window" />
-          <span className="num w-28 shrink-0 text-right text-muted">{step >= SLIDER_STEPS ? "full window" : istDateTime(new Date(cutoff).toISOString())}</span>
+          <span className="num w-32 shrink-0 text-right text-muted">{step >= SLIDER_STEPS ? "full window" : istDateTime(new Date(cutoff).toISOString())}</span>
         </label>
-        {anyExpanded && (
-          <Button size="sm" variant="ghost" onClick={() => setExpanded({ sender: false, receiver: false })}>Show top 8</Button>
-        )}
-        <Legend />
-        <span className="num shrink-0 text-xs text-muted">in {inrShort(view.nodes.find((n) => n.role === "mule")?.amount)}</span>
+        <div className="flex items-center justify-between gap-3">
+          <Legend />
+          <div className="flex shrink-0 items-center gap-2">
+            {anyExpanded && (
+              <Button size="sm" variant="ghost" onClick={() => setExpanded({ sender: false, receiver: false })}>Show top 8</Button>
+            )}
+            <span className="num text-xs text-muted">in {inrShort(view.nodes.find((n) => n.role === "mule")?.amount)}</span>
+          </div>
+        </div>
       </div>
     </div>
   );
