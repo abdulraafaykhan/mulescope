@@ -16,7 +16,7 @@ from backend.app.domain.enums import CaseStatus, Disposition
 from backend.app.domain.policy.disposition import PolicyResult
 from backend.app.graph.deps import deps_of
 from backend.app.graph.instrument import META_KEY, node
-from backend.app.graph.nodes.decide import _jsonable, _persist_actions
+from backend.app.graph.nodes.decide import _jsonable, _persist_actions, with_current_evidence
 from backend.app.graph.state import CaseState
 
 STATUS_BY_DISPOSITION = {
@@ -88,7 +88,7 @@ async def execute_actions(state: CaseState, config: RunnableConfig) -> dict[str,
         await deps.audit.append(ts=now, actor={"type": "system", "id": "execute_actions"}, event="action.executed", entity={"type": "action", "id": a["id"]}, case_id=state["case_id"], run_id=state["run_id"], payload={"type": a["type"], "target": a["target"]})
         executed += 1
     refreshed = await deps.actions.for_case(state["case_id"])
-    return {"proposed_actions": _jsonable(refreshed), META_KEY: {"summary": f"{executed} actions executed (mock)"}}
+    return {"proposed_actions": _jsonable(with_current_evidence(refreshed, state)), META_KEY: {"summary": f"{executed} actions executed (mock)"}}
 
 
 @node("finalize")

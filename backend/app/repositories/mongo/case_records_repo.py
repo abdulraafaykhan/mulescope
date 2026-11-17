@@ -80,6 +80,20 @@ class MongoActionRepository:
         await self._col.insert_one(doc)
         return True
 
+    async def refresh_proposed(self, idempotency_key: str, run_id: str, evidence_ids: list[str], now: datetime) -> bool:
+        """Point a still-``proposed`` action at the current run and ledger.
+
+        One atomic ``update_one`` filtered on status, so approved, executed,
+        rejected and cancelled actions keep their history untouched.
+
+        Returns:
+            True when a proposed action was refreshed.
+        """
+        res = await self._col.update_one(
+            {"idempotency_key": idempotency_key, "status": "proposed"}, {"$set": {"run_id": run_id, "evidence_ids": evidence_ids, "updated_at": now}}
+        )
+        return res.modified_count > 0
+
     async def for_case(self, case_id: str) -> list[dict[str, Any]]:
         return [plain(d) async for d in self._col.find({"case_id": case_id}).sort("_id", 1)]  # type: ignore[misc]
 

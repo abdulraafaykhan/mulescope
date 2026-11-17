@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.app.agents.text import cite, inr, ist
+from backend.app.agents.text import cite, inr, ist, strip_unknown_ids
 
 PROMPT_VERSION = "narrative-template-1"
 DISPOSITION_LABEL = {"close": "CLOSE", "escalate": "ESCALATE", "str_draft": "STR DRAFT"}
@@ -100,6 +100,10 @@ class TemplateNarrativeWriter:
                 "and the purpose of the related outgoing transfers. Supporting documents such as invoices or agreements are welcome.\n\n"
                 "Please reply within 7 days through your branch or the secure message centre.\n\nThank you,\nCustomer Care"
             )
+        valid = {e["id"] for e in evidence}
+        summary_md = strip_unknown_ids(summary_md, valid)
+        str_md = strip_unknown_ids(str_md, valid) if str_md else None
+        customer_md = strip_unknown_ids(customer_md, valid) if customer_md else None
         citations = sorted({c for text in (summary_md, str_md or "") for c in _ids(text)})
         report = {"summary_md": summary_md, "str_narrative_md": str_md, "customer_query_md": customer_md, "citations": citations, "disposition_stated": disp, "addressed_issues": issues}
         meta = {"fallback_used": True, "prompt_version": PROMPT_VERSION, "model": "template", "summary": f"{len(citations)} citations, {label}"}

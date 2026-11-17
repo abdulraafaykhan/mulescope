@@ -18,7 +18,7 @@ from backend.app.agents.critic import code_checks
 from backend.app.agents.narrative import TemplateNarrativeWriter, _ids
 from backend.app.agents.prompts import load_prompt
 from backend.app.agents.schemas import CriticOutput, NarrativeOutput, Sentence
-from backend.app.agents.text import cite, fallback_reason
+from backend.app.agents.text import cite, fallback_reason, strip_unknown_ids
 from backend.app.core.config_files import AgentModelConfig
 from backend.app.core.errors import LLMUnavailable
 from backend.app.llm.client import LlmClient
@@ -32,7 +32,7 @@ def _render(sentences: list[Sentence], valid: set[str]) -> list[str]:
     for s in sentences:
         ids = [i for i in s.evidence_ids if i in valid]
         if ids:
-            out.append(f"{s.text.strip()} {cite(*ids)}")
+            out.append(f"{strip_unknown_ids(s.text, valid).strip()} {cite(*ids)}")
     return out
 
 
@@ -99,6 +99,9 @@ class LiveNarrativeWriter:
         customer_md = base["customer_query_md"]
         if disp == "escalate" and out.customer_query and not _has_terms(out.customer_query, self._terms):
             customer_md = out.customer_query.strip()
+        summary_md = strip_unknown_ids(summary_md, valid)
+        str_md = strip_unknown_ids(str_md, valid) if str_md else None
+        customer_md = strip_unknown_ids(customer_md, valid) if customer_md else None
         citations = sorted({c for text in (summary_md, str_md or "") for c in _ids(text)})
         return {**base, "summary_md": summary_md, "str_narrative_md": str_md, "customer_query_md": customer_md, "citations": citations}
 

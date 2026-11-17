@@ -58,13 +58,31 @@ async def _persist_actions(deps: GraphDeps, state: CaseState, policy: PolicyResu
     ids = await deps.counters.next_ids("actions", "ACT-", len(proposed), now, width=5) if proposed else []
     for action, aid in zip(proposed, ids, strict=True):
         due = now.timestamp() + action.due_in_days * 86_400
-        await deps.actions.upsert_proposed({
+        inserted = await deps.actions.upsert_proposed({
             "_id": aid, "case_id": state["case_id"], "run_id": state["run_id"], **action.model_dump(), "status": "proposed",
             "proposed_by": "plan_actions", "approved_by": None, "due_at": now.fromtimestamp(due, tz=now.tzinfo), "executed_at": None, "result": None,
             "evidence_ids": signal_ids, "history": [{"ts": now, "status": "proposed", "by": "plan_actions"}], "created_at": now, "updated_at": now, "schema_version": 1,
         })
+        if not inserted:
+            # Same key from an earlier run: move a still-proposed action to this run's ledger.
+            await deps.actions.refresh_proposed(action.idempotency_key, state["run_id"], signal_ids, now)
     keys = {a.idempotency_key for a in proposed}
-    return [a for a in await deps.actions.for_case(state["case_id"]) if a["idempotency_key"] in keys]
+    rows = [a for a in await deps.actions.for_case(state["case_id"]) if a["idempotency_key"] in keys]
+    return with_current_evidence(rows, state)
+
+
+def with_current_evidence(rows: list[dict[str, Any]], state: CaseState) -> list[dict[str, Any]]:
+    """Copy action rows with ``evidence_ids`` limited to the current run's ledger.
+
+    Why: approved or executed actions keep the ids of the run that created
+    them, and those ids are not in this run's ledger. Only the copy sent on to
+    the narrative and critic changes; stored history is never rewritten.
+    Falls back to the current risk-signal ids when nothing is left.
+    """
+    evidence = state.get("evidence", [])
+    ledger = {e["id"] for e in evidence}
+    signal_ids = [e["id"] for e in evidence if e["kind"] == "signal" and e.get("data", {}).get("kind") == "risk"]
+    return [{**r, "evidence_ids": [i for i in r.get("evidence_ids", []) if i in ledger] or signal_ids} for r in rows]
 
 
 def _jsonable(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
