@@ -198,10 +198,6 @@ PROGRESS.md        build checklist, decisions and known gaps
 
 Thresholds, weights, scenario parameters, model names, token limits and action rules live in `config/*.yaml`, not in code. Changing a signal weight or a playbook rule needs no code change; rerun `uv run check-policy` to see the effect on the 40 planted alerts.
 
-## How it was built
-
-MuleScope was built with Kiro, the AI development environment. The specification is [docs/BUILD_PROMPT.md](docs/BUILD_PROMPT.md). Most phases were built directly from it. The project scaffold and the live-mode fixes went through Kiro specs (requirements or bug analysis, design and tasks), kept in [.kiro/specs](.kiro/specs). [PROGRESS.md](PROGRESS.md) records each phase, the decisions made and why, and the known gaps.
-
 ## Known limits
 
 - There is no separate reviewer gate for STR drafts (maker-checker); one analyst gate decides.
