@@ -1,0 +1,216 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Capture the baseline and confirm the root causes (no edits)": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903120941
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903134833
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903332266
+      }
+    ],
+    "2. Route the narrative to Groq with a fallback model": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121098
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903340515
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903429647
+      }
+    ],
+    "3. Cap LLM call time per node": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121186
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903433846
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903732880
+      }
+    ],
+    "4. Log fallback reasons and show them in smoke output and the UI": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121284
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903736349
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903910538
+      }
+    ],
+    "5. Refresh actions evidence on rerun and strip unknown ids": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121369
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903914869
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794904057916
+      }
+    ],
+    "6. Fix zero amounts in the template narrative": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121452
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794904062510
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794904155475
+      }
+    ],
+    "7. Update PROGRESS.md and the README LLM model line": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121541
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794904160440
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794904222760
+      }
+    ],
+    "8.1 Re-run the fallback checks": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121630
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794904226356
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794904278860
+      }
+    ],
+    "8.2 Run live smoke for both scenarios": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121715
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794904282369
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794904389156
+      }
+    ],
+    "8.3 Fix live failures (up to 2 fix attempts)": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121793
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794904392642
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794905178850
+      }
+    ],
+    "8.4 Check the live rerun path on mule.classic": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121871
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794905182640
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794905319420
+      }
+    ],
+    "8.5 Report the results": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794903121961
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794905319831
+      },
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794905325836
+      }
+    ],
+    "8. Final verification: live smoke runs, fix what fails, then report": [
+      {
+        "executionId": "60a0866a-4258-47cb-83e2-fb0bdf108fa5",
+        "chatSessionId": "sess_7bf5f1de-8f9f-4dd2-bfc9-01f79eed8405",
+        "timestamp": 1794905325928
+      }
+    ]
+  }
+}

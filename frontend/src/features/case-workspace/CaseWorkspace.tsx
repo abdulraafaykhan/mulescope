@@ -58,7 +58,7 @@ export default function CaseWorkspace() {
   const d = detail.data;
 
   return (
-    <EvidenceProvider evidence={evidence.data ?? []}>
+    <EvidenceProvider evidence={evidence.data ?? []} runId={run?.id ?? null}>
       <div className="flex h-full flex-col">
         <CaseHeader detail={d} report={report.data ?? null} streamState={stream.state} />
         <div className="shrink-0 px-3 pt-3">

@@ -48,7 +48,7 @@ function ActionItem({ action, caseId }: { action: Action; caseId: string }) {
       <div className="mt-1 flex flex-wrap items-center gap-1 pl-4 text-[11px] text-muted">
         {action.requires_approval && <span className="flex items-center gap-0.5 rounded border border-risk-medium/40 px-1 text-risk-medium"><ShieldQuestion size={10} aria-hidden />needs approval</span>}
         <span className="rounded border border-line px-1">{action.reversible ? "reversible" : "irreversible"}</span>
-        {action.evidence_ids.slice(0, MAX_CHIPS).map((id) => <EvdChip key={id} id={id} />)}
+        {action.evidence_ids.slice(0, MAX_CHIPS).map((id) => <EvdChip key={id} id={id} originRunId={action.run_id} />)}
         {action.evidence_ids.length > MAX_CHIPS && <span>+{action.evidence_ids.length - MAX_CHIPS}</span>}
       </div>
       {open && (
