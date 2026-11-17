@@ -1,0 +1,30 @@
+/*
+ * Design tokens (build prompt section 9.1, dark theme). Mapped into the Tailwind
+ * theme in index.css, so `bg-panel`, `text-secondary`, `text-role-mule` etc. exist
+ * as utilities. The same colour always means the same thing across the app.
+ */
+:root {
+  --c-bg-app: #0b0f1a;
+  --c-bg-panel: #121826;
+  --c-bg-elevated: #1a2236;
+  --c-border: #263149;
+  --c-text-primary: #e6eaf2;
+  --c-text-secondary: #9aa6bf;
+  --c-text-muted: #6b7790;
+  --c-accent: #4f8cff;
+
+  --c-risk-critical: #ff5c6c;
+  --c-risk-high: #ff9f43;
+  --c-risk-medium: #f5c84c;
+  --c-risk-low: #3dd6a0;
+
+  --c-role-sender: #4f8cff;
+  --c-role-mule: #ff5c6c;
+  --c-role-receiver: #a78bfa;
+
+  --c-agent-profiler: #38bdf8;
+  --c-agent-flow: #34d399;
+  --c-agent-narrative: #c084fc;
+  --c-agent-critic: #fbbf24;
+  --c-agent-code: #94a3b8;
+}

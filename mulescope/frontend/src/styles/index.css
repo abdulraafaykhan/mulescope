@@ -1,0 +1,114 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+@import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+@import "./tokens.css";
+
+@theme {
+  --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+
+  /* Type scale 12, 13, 14, 16, 20, 28 */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+
+  --radius-card: 8px;
+
+  --color-app: var(--c-bg-app);
+  --color-panel: var(--c-bg-panel);
+  --color-elevated: var(--c-bg-elevated);
+  --color-line: var(--c-border);
+  --color-primary: var(--c-text-primary);
+  --color-secondary: var(--c-text-secondary);
+  --color-muted: var(--c-text-muted);
+  --color-accent: var(--c-accent);
+
+  --color-risk-critical: var(--c-risk-critical);
+  --color-risk-high: var(--c-risk-high);
+  --color-risk-medium: var(--c-risk-medium);
+  --color-risk-low: var(--c-risk-low);
+
+  --color-role-sender: var(--c-role-sender);
+  --color-role-mule: var(--c-role-mule);
+  --color-role-receiver: var(--c-role-receiver);
+
+  --color-agent-profiler: var(--c-agent-profiler);
+  --color-agent-flow: var(--c-agent-flow);
+  --color-agent-narrative: var(--c-agent-narrative);
+  --color-agent-critic: var(--c-agent-critic);
+  --color-agent-code: var(--c-agent-code);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--c-bg-app);
+  color: var(--c-text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Amounts, ids and hashes align in columns. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 1px;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--c-border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); }
+  100% { box-shadow: 0 0 0 6px transparent; }
+}
+.pulse-dot {
+  animation: pulse-ring 1.2s ease-out infinite;
+}
+
+/* React Flow: match the dark panel instead of its light defaults. */
+.react-flow {
+  --xy-background-color: var(--c-bg-panel);
+  --xy-edge-label-background-color: var(--c-bg-elevated);
+  --xy-edge-label-color: var(--c-text-secondary);
+  --xy-controls-button-background-color: var(--c-bg-elevated);
+  --xy-controls-button-background-color-hover: var(--c-border);
+  --xy-controls-button-color: var(--c-text-primary);
+  --xy-controls-button-border-color: var(--c-border);
+  --xy-minimap-background-color: var(--c-bg-app);
+}
+
+.md h2 { font-size: 16px; font-weight: 600; margin: 18px 0 8px; color: var(--c-text-primary); }
+.md h3 { font-size: 14px; font-weight: 600; margin: 12px 0 6px; color: var(--c-text-secondary); }
+.md p { margin: 6px 0; line-height: 1.6; }
+.md ul { margin: 6px 0; padding-left: 18px; list-style: disc; }
+.md li { margin: 3px 0; line-height: 1.55; }
+
+@media print {
+  body { background: #fff; color: #000; }
+  .no-print { display: none !important; }
+  .print-area { position: static !important; overflow: visible !important; }
+}

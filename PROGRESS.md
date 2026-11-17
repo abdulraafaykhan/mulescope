@@ -12,7 +12,7 @@ smoke commands only, commit after each phase). This run stopped after phase 3 as
 - [x] Phase 2: domain logic. Smoke: `uv run check-policy` 40/40 (100%), 0 mules closed.
 - [x] Phase 3: API and graph in fallback mode. Smoke: `uv run smoke` mule -> STR draft, seller -> Close, ~3 s per run, audit chains valid; resume after API restart verified.
 - [ ] Phase 4: live LLM agents (Groq/Gemini provider, cache, limiter, prompts, structured output). Keys in `.env` are empty, so fallback stays on.
-- [ ] Phase 5: analyst UI (React + Vite + TS, queue, case workspace, flow graph, agents stepper over SSE, actions, audit, diagnostics).
+- [x] Phase 5: analyst UI (React + Vite + TS, queue, case workspace, flow graph, agents stepper over SSE, actions, audit, diagnostics). Smoke: `npm run build` passes (tsc clean). Not yet clicked through against a live API: this clone has no `.env`, so the API cannot reach Mongo (see Known gaps).
 - [ ] Phase 6: `uv run evals --mode fallback|live`, Evals page, README.
 
 ## State of the build
@@ -30,6 +30,12 @@ Data (`mulescope/datagen`): personas engine (NumPy vectorised), counterparty poo
 
 Scripts: `uv run seed`, `uv run dev`, `uv run check-policy`, `uv run smoke`, `uv run evals` (stub).
 
+Frontend (`mulescope/frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
+- `src/types/api.ts`: every API type in one hand-written file, mirroring `services/case_query.py`, the Mongo repositories and the graph node documents.
+- `src/lib/`: fetch client with the error envelope, one TanStack Query hook per resource, `useRunStream` (SSE with reconnect + refetch), formatters (INR Indian grouping, IST, masking), colour/status metadata.
+- `src/features/`: queue, case-workspace (header + decisions, entity strip, score breakdown, evidence, timeline, transactions, report), flow-graph (React Flow + dagre account cards), agents (live stepper), actions, audit (audit log + diagnostics drawer), account drawer, evals.
+- Start: `cd mulescope/frontend; npm install; npm run dev` and open http://localhost:5173 (API must be on http://127.0.0.1:8000 via `uv run dev`). Override the API URL with `VITE_API_URL` in `frontend/.env.local`.
+
 ## Decisions
 
 - MongoDB is Atlas from the workspace `.env` (read-only). No local Docker on this machine.
@@ -46,10 +52,18 @@ Scripts: `uv run seed`, `uv run dev`, `uv run check-policy`, `uv run smoke`, `uv
 - Critic word lists, STR section headings and required evidence kinds live in `config/playbook.yaml`.
 - Evals and smoke run from the CLI only, because the API process never opens the truth database.
 - Faker 40.54.0 and NumPy 2.5.5 added (both in the section 2 stack, pinned).
+- UI: API types are hand-written in `src/types/api.ts` (by instruction) rather than generated with openapi-typescript, because most routes return plain dicts with no response model.
+- UI: shadcn/ui primitives are hand-written in `components/ui/` in the same Tailwind style (no shadcn CLI, no Radix). Fonts self-hosted with `@fontsource-variable` (Inter, JetBrains Mono). `lucide-react` added for icons; `@tanstack/react-virtual` for the transactions table; `react-router` for routes. All pinned exactly.
+- UI SSE: the stream has no heartbeat and its history lives in API memory. `useRunStream` reconnects with backoff (1 s to 10 s), clears live events on each connect (the server replays history), and refetches the case and node_executions on every drop. The Agents stepper layers live events over persisted node_executions, and case/diagnostics poll every 3 s while a run is `running`, so a silent drop or API restart cannot leave it stale.
+- UI score breakdown is built from the `signal` evidence items (fired signals and mitigators with points); there is no separate breakdown endpoint.
+- UI decisions: Approve and Request more post directly; Edit, Override and Reject open a dialog (override and reject require a reason, matching the API rules).
+- CORS: `CORS_ORIGINS` (JSON list) already defaulted to `http://localhost:5173` and `http://127.0.0.1:5173`; now documented in `.env.example` with `VITE_API_URL`.
 
 ## Known gaps
 
-- Phases 4-6 not built: no live LLM agents, no UI, no eval harness or README update.
+- This clone has no `.env` (neither `mulescope/.env` nor the workspace `.env`), so `uv run dev` fails on the missing `MONGO_URI` and nothing could be checked against the live Atlas data. The UI types were checked against the backend code that builds each response, not against captured responses. Restore the `.env` and click through once.
+- UI not built: light theme, keyboard shortcuts, Playwright, generated OpenAPI types (all skipped by instruction); the Audit explorer and Settings screens; PAN/account "reveal on click" (the API only ever returns masked values). The diagnostics cache hit rate shows "n/a" until the LLM cache exists.
+- Sender cards show party type and count, not sender account age and KYC type, because the entity strip read model does not carry them for external parties.
 - Separate reviewer gate (maker-checker for STR) skipped; one analyst gate only.
 - Most API responses are plain dicts, not dedicated response models.
 - SSE has no heartbeat; event history is in memory (a reconnect after an API restart only sees new events).
@@ -69,4 +83,5 @@ uv run seed --preview ACC-123456                 # one account's 14-day story
 uv run check-policy                              # expected vs predicted for the 40 planted alerts
 uv run smoke                                     # mule + seller through the graph, auto-approve
 uv run dev                                       # API on http://127.0.0.1:8000 (/health, /docs)
+cd frontend; npm install; npm run dev            # UI on http://localhost:5173
 ```
