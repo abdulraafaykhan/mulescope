@@ -1,9 +1,9 @@
-"""Structured LLM calls: cache, global semaphore, retry with backoff, schema repair.
+﻿"""Structured LLM calls: cache, global semaphore, retry with backoff, schema repair.
 
 ``LlmClient.structured`` is the only way agents reach a model:
 
 1. Look up ``llm_cache`` by ``sha256(model, prompt_version, system, user)``.
-2. Otherwise take the global semaphore (``limits.max_concurrency``), call the
+2. Otherwise try the primary model, then `fallback_model`; each takes the global semaphore (``limits.max_concurrency``), call the
    provider and retry retryable errors with exponential backoff.
 3. Parse the JSON and validate it into the agent's Pydantic schema; on a
    mismatch, ask once more with the validation error (repair), then give up.
@@ -85,33 +85,56 @@ class LlmClient:
     async def structured(self, route: AgentModelConfig, prompt_version: str, system: str, user: str, schema: type[SchemaT]) -> tuple[SchemaT, CallMeta]:
         """Return validated output of ``schema`` and the call cost.
 
+        Tries ``route.model`` first, then ``route.fallback_model`` (same provider).
+        The cache key uses the primary model so a re-run hits the cache whichever
+        model answered; ``meta.model`` and ``llm_cache.model`` hold the answering model.
+
         Raises:
-            LLMUnavailable: Provider missing, retries exhausted or output invalid after repair.
+            LLMUnavailable: Provider missing, or no model answered with valid output.
         """
         meta = CallMeta(model=route.model, prompt_version=prompt_version)
         provider = self._providers.get(route.provider.value)
         if provider is None:
-            raise LLMUnavailable(f"{route.provider.value} is not configured")
+            raise LLMUnavailable(f"{route.provider.value}/{route.model}: provider is not configured")
         key = cache_key(route.model, prompt_version, system, user)
         if self._cache is not None and (hit := await self._cache.get(key)):
             meta.cache_hit = True
             return schema.model_validate(hit["response"]), meta
 
+        models = [route.model] + ([route.fallback_model] if route.fallback_model else [])
+        for model in models:
+            parsed = await self._try_model(provider, route, model, system, user, schema, meta)
+            if parsed is None:
+                continue
+            if self._cache is not None:
+                await self._cache.put(key, model=meta.model, prompt_version=prompt_version, response=parsed.model_dump(mode="json"), tokens={"in": meta.tokens_in, "out": meta.tokens_out}, now=self._clock.now())
+            return parsed, meta
+        raise LLMUnavailable(f"{provider.name}/{models[-1]}: no model answered", detail={"errors": meta.errors})
+
+    async def _try_model(self, provider: LLMProvider, route: AgentModelConfig, model: str, system: str, user: str, schema: type[SchemaT], meta: CallMeta) -> SchemaT | None:
+        """Run the call and repair loop on one model; ``None`` means try the next model.
+
+        Errors are appended to ``meta.errors`` with a ``provider/model`` prefix.
+        """
         message = user
         for attempt in range(self._limits.repair_attempts + 1):
-            text = await self._call(provider, LlmRequest(system, message, route.model, route.temperature or 0.0, route.max_tokens), meta)
+            request = LlmRequest(system, message, model, route.temperature or 0.0, route.max_tokens)
+            try:
+                text = await self._call(provider, request, meta)
+            except LLMUnavailable:
+                return None
             try:
                 parsed = schema.model_validate(json.loads(_strip_fence(text)))
             except (json.JSONDecodeError, ValidationError) as exc:
-                meta.errors.append(f"invalid output (attempt {attempt + 1}): {str(exc)[:160]}")
+                meta.errors.append(f"{provider.name}/{model}: invalid output (attempt {attempt + 1}): {str(exc)[:160]}")
                 message = f"{user}\n\nYour previous answer was not valid JSON for the schema: {str(exc)[:400]}\nReturn only the corrected JSON object."
                 continue
-            if self._cache is not None:
-                await self._cache.put(key, model=route.model, prompt_version=prompt_version, response=parsed.model_dump(mode="json"), tokens={"in": meta.tokens_in, "out": meta.tokens_out}, now=self._clock.now())
-            return parsed, meta
-        raise LLMUnavailable("output did not match the schema after repair", detail={"errors": meta.errors})
+            meta.model = model
+            return parsed
+        return None
 
     async def _call(self, provider: LLMProvider, request: LlmRequest, meta: CallMeta) -> str:
+        label = f"{provider.name}/{request.model}"
         delay = self._limits.backoff_base_seconds
         for attempt in range(self._limits.max_retries + 1):
             try:
@@ -119,19 +142,17 @@ class LlmClient:
                     resp = await provider.complete(request)
                 meta.tokens_in += resp.tokens_in
                 meta.tokens_out += resp.tokens_out
-                meta.model = resp.model
                 return resp.text
             except ProviderError as exc:
-                meta.errors.append(str(exc)[:200])
+                meta.errors.append(f"{label}: {exc}"[:200])
                 if not exc.retryable or attempt == self._limits.max_retries:
-                    raise LLMUnavailable(f"{provider.name} failed: {exc}"[:300]) from exc
+                    raise LLMUnavailable(f"{label} failed: {exc}"[:300]) from exc
                 meta.retries += 1
                 wait = min(exc.retry_after or delay, self._limits.backoff_max_seconds)
                 _logger.warning("llm retry", extra={"provider": provider.name, "attempt": attempt + 1, "wait_s": wait})
                 await asyncio.sleep(wait)
                 delay = min(delay * 2, self._limits.backoff_max_seconds)
-        raise LLMUnavailable(f"{provider.name} failed")
-
+        raise LLMUnavailable(f"{label} failed")
     async def aclose(self) -> None:
         for p in self._providers.values():
             await p.aclose()

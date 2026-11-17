@@ -97,12 +97,15 @@ class AgentModelConfig(_ConfigModel):
 
     Attributes:
         provider: Provider that serves this agent.
-        model: Model name at that provider.
+        model: Primary model name at that provider.
+        fallback_model: Optional second model at the same provider, tried when the
+            primary fails or returns invalid output, before the template fallback.
         temperature: Sampling temperature, or ``None`` while still a placeholder.
     """
 
     provider: LlmProvider
     model: str = Field(min_length=1)
+    fallback_model: str | None = Field(default=None, min_length=1)
     temperature: float | None = Field(default=None, ge=0)
     max_tokens: int = Field(default=1500, gt=0)
 

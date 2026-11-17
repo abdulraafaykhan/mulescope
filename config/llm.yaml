@@ -5,8 +5,9 @@
 # literals in code. Keys come from the environment only (GROQ_API_KEY,
 # GEMINI_API_KEY); never put keys in this file.
 #
-# Groq runs the Profiler, Flow Analyst and Critic on its small model; Gemini
-# Flash runs only the Narrative Writer. Any failure falls back to the node's
+# Groq runs the Profiler, Flow Analyst and Critic on its small model and the
+# Narrative Writer on its larger model (Gemini is selectable per agent, see
+# narrative_writer below). Any failure falls back to the node's
 # template implementation, so a run never fails because of an LLM.
 
 version: "1.0.0"
@@ -36,10 +37,16 @@ agents:
     temperature: 0
     max_tokens: 1500
   narrative_writer:
-    provider: gemini
-    model: "gemini-3.8-flash"
+    # To switch back to Gemini, set provider: gemini and model: "gemini-3.8-flash"
+    # (and drop or change fallback_model). No code change needed. Gemini is not
+    # reachable from the dev machine right now: gemini-3.8-flash and 3.7-flash
+    # time out after 20 s, 3.6-flash returns 503.
+    provider: groq
+    model: "openai/gpt-oss-120b"
+    # Tried when the primary fails or returns invalid output; same provider.
+    fallback_model: "openai/gpt-oss-20b"
     temperature: 0
-    # Thinking tokens count against the output budget on Gemini 3.x models.
+    # Thinking tokens count against the output budget on Gemini 3.x and gpt-oss models.
     max_tokens: 6000
   critic:
     provider: groq
