@@ -23,6 +23,8 @@ class LlmRequest:
         model: Provider model id from ``config/llm.yaml``.
         temperature: Sampling temperature (0 for reproducibility).
         max_tokens: Output token budget.
+        reasoning_effort: ``low``, ``medium`` or ``high`` for providers that
+            support it (Groq gpt-oss); ``None`` keeps the provider default.
     """
 
     system: str
@@ -30,6 +32,7 @@ class LlmRequest:
     model: str
     temperature: float
     max_tokens: int
+    reasoning_effort: str | None = None
 
 
 @dataclass(frozen=True)

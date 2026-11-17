@@ -30,11 +30,13 @@ agents:
     provider: groq
     model: "openai/gpt-oss-20b"
     temperature: 0
+    reasoning_effort: low
     max_tokens: 1500
   flow_analyst:
     provider: groq
     model: "openai/gpt-oss-20b"
     temperature: 0
+    reasoning_effort: low
     max_tokens: 1500
   narrative_writer:
     # To switch back to Gemini, set provider: gemini and model: "gemini-3.8-flash"
@@ -46,6 +48,9 @@ agents:
     # Tried when the primary fails or returns invalid output; same provider.
     fallback_model: "openai/gpt-oss-20b"
     temperature: 0
+    # Low effort: the free tier allows about 8k tokens per minute per model, and a
+    # medium-effort narrative plus critic round used most of it (HTTP 429).
+    reasoning_effort: low
     # Thinking tokens count against the output budget on Gemini 3.x and gpt-oss models.
     max_tokens: 6000
   critic:
@@ -54,6 +59,8 @@ agents:
     temperature: 0
     # gpt-oss reasons before it writes; at 1200 the reasoning used the whole budget on
     # some drafts and Groq answered 400 json_validate_failed with an empty failed_generation.
+    # Low effort keeps the reasoning short so the JSON fits and the token rate stays down.
+    reasoning_effort: low
     max_tokens: 3000
 
 # Free-tier protection: one global semaphore across all agents.

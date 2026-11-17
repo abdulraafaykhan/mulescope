@@ -24,7 +24,7 @@ from __future__ import annotations
 from datetime import timedelta
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -101,6 +101,9 @@ class AgentModelConfig(_ConfigModel):
         fallback_model: Optional second model at the same provider, tried when the
             primary fails or returns invalid output, before the template fallback.
         temperature: Sampling temperature, or ``None`` while still a placeholder.
+        reasoning_effort: Groq ``reasoning_effort`` for gpt-oss models (``low``,
+            ``medium`` or ``high``). ``None`` leaves the provider default. Ignored
+            by Gemini.
     """
 
     provider: LlmProvider
@@ -108,6 +111,7 @@ class AgentModelConfig(_ConfigModel):
     fallback_model: str | None = Field(default=None, min_length=1)
     temperature: float | None = Field(default=None, ge=0)
     max_tokens: int = Field(default=1500, gt=0)
+    reasoning_effort: Literal["low", "medium", "high"] | None = None
 
 
 class AgentsConfig(_ConfigModel):

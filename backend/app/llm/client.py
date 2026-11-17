@@ -136,7 +136,7 @@ class LlmClient:
         """
         message = user
         for attempt in range(self._limits.repair_attempts + 1):
-            request = LlmRequest(system, message, model, route.temperature or 0.0, route.max_tokens)
+            request = LlmRequest(system, message, model, route.temperature or 0.0, route.max_tokens, route.reasoning_effort)
             try:
                 text = await self._call(provider, request, meta, deadline)
             except LLMUnavailable:

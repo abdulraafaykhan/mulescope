@@ -86,6 +86,9 @@ class GroqProvider:
             "max_completion_tokens": request.max_tokens,
             "response_format": {"type": "json_object"},
         }
+        if request.reasoning_effort:
+            # gpt-oss spends completion tokens on reasoning; low keeps room for the JSON.
+            body["reasoning_effort"] = request.reasoning_effort
         data = await _post(self._client, self._url, body, {"Authorization": f"Bearer {self._key}"})
         try:
             text = data["choices"][0]["message"]["content"] or ""
