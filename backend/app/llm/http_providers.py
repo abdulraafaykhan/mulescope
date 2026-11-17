@@ -9,6 +9,7 @@ URLs come from ``config/llm.yaml``; keys from settings.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import httpx
@@ -17,7 +18,9 @@ from backend.app.llm.provider import LlmRequest, LlmResponse, ProviderError
 
 RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504}
 ERROR_BODY_MAX = 200
-MESSAGE_MAX = 120
+# Long enough to keep the limit, used and requested token counts of a Groq 429.
+MESSAGE_MAX = 260
+_ORGANIZATION = re.compile(r" in organization `[^`]*`")
 FAILED_GENERATION_MAX = 400
 
 
@@ -31,7 +34,9 @@ def _error_text(resp: httpx.Response) -> str:
     try:
         error = resp.json()["error"]
         code = error.get("code") or error.get("type") or ""
-        head = f"HTTP {resp.status_code} {code}".strip() + f": {str(error.get('message', ''))[:MESSAGE_MAX]}"
+        # The organization id adds nothing to a diagnosis and eats the character budget.
+        message = _ORGANIZATION.sub("", str(error.get("message", "")))[:MESSAGE_MAX]
+        head = f"HTTP {resp.status_code} {code}".strip() + f": {message}"
         if "failed_generation" not in error:
             return head
         # An empty value is informative too: the model produced no JSON at all.
