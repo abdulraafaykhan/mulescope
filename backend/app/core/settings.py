@@ -13,16 +13,14 @@ API can never reach the truth database (build prompt section 5):
 Sources, lowest to highest precedence:
 
 1. Field defaults in this module.
-2. ``<project>/.env``, the ``mulescope/`` project root.
-3. ``<workspace>/.env``, the directory above the project root (where the
-   real local ``.env`` lives).
-4. Real environment variables (for example ``$env:LLM_MODE = "live"``).
+2. ``<repo root>/.env``, the single local env file.
+3. Real environment variables (for example ``$env:LLM_MODE = "live"``).
 
-Both ``.env`` paths are resolved from this file's location, not from the
-current working directory, so ``uv run ...`` from ``mulescope/`` finds the
-workspace-level file. Missing files are skipped. Unknown keys in either file
-are ignored, which is what lets the API process load a ``.env`` that also
-carries ``MONGO_TRUTH_URI`` without ever exposing it.
+The ``.env`` path is resolved from this file's location, not from the
+current working directory, so ``uv run ...`` finds it from any folder. A
+missing file is skipped. Unknown keys are ignored, which is what lets the
+API process load a ``.env`` that also carries ``MONGO_TRUTH_URI`` without
+ever exposing it.
 
 Secrets (API keys and Mongo URIs, which may embed a password) are typed as
 :class:`~pydantic.SecretStr`, so they never appear in ``repr`` output or logs.
@@ -53,10 +51,10 @@ __all__ = [
 ]
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
-"""The ``mulescope/`` project root (``backend/app/core/settings.py`` -> 3 levels up)."""
+"""The repository root (``backend/app/core/settings.py`` -> 3 levels up)."""
 
-ENV_FILES: Final[tuple[Path, ...]] = (PROJECT_ROOT / ".env", PROJECT_ROOT.parent / ".env")
-"""``.env`` files read in order; later files win, missing files are skipped."""
+ENV_FILES: Final[tuple[Path, ...]] = (PROJECT_ROOT / ".env",)
+"""``.env`` files read in order (just the root one); missing files are skipped."""
 
 CONFIG_DIR: Final[Path] = PROJECT_ROOT / "config"
 """Default directory of the ``config/*.yaml`` files."""

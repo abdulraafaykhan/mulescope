@@ -45,7 +45,7 @@ requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-# Top-level packages importable from the mulescope/ root, e.g. backend.app.main.
+# Top-level packages importable from the repo root, e.g. backend.app.main.
 packages = ["backend", "datagen", "evals"]
 
 [tool.uv]

@@ -39,7 +39,7 @@ The backend is layered. Dependencies point **inward only**: controllers call ser
 Create exactly this layout. Every module gets a module docstring explaining its role and who calls it.
 
 ```text
-mulescope/
+./                            # repository root (no mulescope/ subfolder)
 ├── pyproject.toml            # uv project, scripts: seed, dev, evals, lint
 ├── docker-compose.yml        # local MongoDB 7 only
 ├── .env.example

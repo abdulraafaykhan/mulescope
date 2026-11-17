@@ -1,4 +1,4 @@
-# PROGRESS
+﻿# PROGRESS
 
 Checklist of build phases. If context is lost, continue from the first unchecked item.
 Source of truth for stack, data model, graph, scoring and UI: `docs/BUILD_PROMPT.md`.
@@ -17,7 +17,7 @@ smoke commands only, commit after each phase). Phases were built in the order 5,
 
 ## State of the build
 
-Backend (`mulescope/backend/app`):
+Backend (`backend/app`):
 - `core/`: settings (API has no truth URI), container (async client + sync checkpointer client), wiring, logging, errors, config loaders.
 - `domain/`: enums, `metrics.py` (all section 8.1 metrics), `signals/` (registry + 9 risk signals + 4 mitigators), `policy/` (config models, detector rules, scoring, disposition, typology, action planner).
 - `repositories/mongo/`: bootstrap (validators + indexes), one class per collection, audit hash chain with `verify_chain`.
@@ -26,20 +26,22 @@ Backend (`mulescope/backend/app`):
 - `graph/`: state, deps, instrument decorator (node_executions + audit + stream events), nodes, edges with loop caps, builder (MongoDBSaver).
 - `api/routers/`: `/health`; `/api/v1` config, alerts (list, get, detect), cases (list, detail, runs, decision, evidence, report, actions, flow, timeline, transactions, audit verify), accounts (get, summary), actions (patch), audit, runs (SSE stream, diagnostics), evals (read; POST points to the CLI).
 
-Data (`mulescope/datagen`): personas engine (NumPy vectorised), counterparty pools, 5 scenario classes / 16 variants / 40 planted accounts, ledger builder (double entry, running balances, time-ordered transfer ids), writers, validation, `--preview`.
+Data (`datagen`): personas engine (NumPy vectorised), counterparty pools, 5 scenario classes / 16 variants / 40 planted accounts, ledger builder (double entry, running balances, time-ordered transfer ids), writers, validation, `--preview`.
 
 Scripts: `uv run seed`, `uv run dev`, `uv run check-policy`, `uv run smoke`, `uv run evals` (stub).
 
-Frontend (`mulescope/frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
+Frontend (`frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
 - `src/types/api.ts`: every API type in one hand-written file, mirroring `services/case_query.py`, the Mongo repositories and the graph node documents.
 - `src/lib/`: fetch client with the error envelope, one TanStack Query hook per resource, `useRunStream` (SSE with reconnect + refetch), formatters (INR Indian grouping, IST, masking), colour/status metadata.
 - `src/features/`: queue, case-workspace (header + decisions, entity strip, score breakdown, evidence, timeline, transactions, report), flow-graph (React Flow + dagre account cards), agents (live stepper), actions, audit (audit log + diagnostics drawer), account drawer, evals.
-- Start: `cd mulescope/frontend; npm install; npm run dev` and open http://localhost:5173 (API must be on http://127.0.0.1:8000 via `uv run dev`). Override the API URL with `VITE_API_URL` in `frontend/.env.local`.
+- Start: `cd frontend; npm install; npm run dev` and open http://localhost:5173 (API must be on http://127.0.0.1:8000 via `uv run dev`). Override the API URL with `VITE_API_URL` in `frontend/.env.local`.
 
 ## Decisions
 
-- MongoDB is Atlas from the workspace `.env` (read-only). No local Docker on this machine.
-- Settings read both `mulescope/.env` and the workspace `.env`; empty `*_API_KEY=` counts as unset.
+- MongoDB is Atlas from the single root `.env` (read-only). No local Docker on this machine.
+- Repo layout flattened: everything that lived in `mulescope/` (backend, frontend, config, datagen, evals, tests, pyproject.toml, uv.lock, docker-compose.yml, .env.example) now sits at the repo root, moved with `git mv`. One `.gitignore`, one `README.md`, one `.env`. Old `.kiro/specs/m0-scaffold` text still says `mulescope/`; it is history and was left alone. `docs/BUILD_PROMPT.md` (the original spec) also keeps its original tree.
+- At flatten time the Atlas cluster in the root `.env` held no MuleScope data: `mulescope` had only empty `checkpoints` / `checkpoint_writes`, and `mulescope_truth` was empty. So `uv run check-policy` and `uv run smoke` ran cleanly but had nothing to evaluate. Seeding was not run (by instruction). `frontend/package.json` had lost its devDependencies in the phase 5 commit; they are restored with the same pinned versions.
+- Settings read one `.env` in the repo root (the former `mulescope/` subfolder was flattened away); empty `*_API_KEY=` counts as unset.
 - `/health` at the root path; all other routes under `/api/v1`.
 - Checkpointer: `MongoDBSaver(ttl=7 days)` on a dedicated sync client built off the event loop. Resume after restart works, so MemorySaver was not needed.
 - Planted alerts: five parametrised classes (mule 10, seller 10, group 8, dormant 6, ambiguous 6); the injected-remark mule is a mule variant.
@@ -75,7 +77,7 @@ Frontend (`mulescope/frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
 - Live LLM calls are unverified against the real Groq and Gemini APIs (no keys). The request/response mapping follows the public API shapes; the first live smoke may need small fixes, which fall back to templates meanwhile.
 - The flow analyst does not run an LLM-driven tool loop: the four read-only tools are called by code, and the LLM interprets the results.
 - No separate token-bucket rate limiter: the semaphore of 2 plus backoff honouring `Retry-After` is the only quota protection. A full live eval may still need several `--resume` sessions.
-- This clone has no `.env` (neither `mulescope/.env` nor the workspace `.env`), so `uv run dev` fails on the missing `MONGO_URI` and nothing could be checked against the live Atlas data. The UI types were checked against the backend code that builds each response, not against captured responses. Restore the `.env` and click through once.
+- An earlier session of this clone had no `.env`, so `uv run dev` failed on the missing `MONGO_URI` and nothing could be checked against the live Atlas data. The UI types were checked against the backend code that builds each response, not against captured responses. Restore the `.env` and click through once.
 - UI not built: light theme, keyboard shortcuts, Playwright, generated OpenAPI types (all skipped by instruction); the Audit explorer and Settings screens; PAN/account "reveal on click" (the API only ever returns masked values). The diagnostics cache hit rate shows "n/a" until the LLM cache exists.
 - Sender cards show party type and count, not sender account age and KYC type, because the entity strip read model does not carry them for external parties.
 - Separate reviewer gate (maker-checker for STR) skipped; one analyst gate only.
@@ -88,7 +90,7 @@ Frontend (`mulescope/frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
 - Customer-facing tipping-off check is keyword based.
 - About 590 counterparties instead of the target of 600.
 
-## Commands (PowerShell, from `mulescope/`)
+## Commands (PowerShell, from the repo root)
 
 ```powershell
 uv sync

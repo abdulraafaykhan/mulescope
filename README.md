@@ -60,22 +60,22 @@ With `LLM_MODE=fallback` (the default) every agent uses its template, so a run n
 
 ## Setup (PowerShell)
 
-Requirements: Python 3.12, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ or 22.12+ and a MongoDB 7 instance (Atlas, or local with `docker compose up -d` in `mulescope/`).
+Requirements: Python 3.12, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ or 22.12+ and a MongoDB 7 instance (Atlas, or local with `docker compose up -d` in the repo root).
 
 ```powershell
-cd mulescope
 uv sync
 Copy-Item .env.example .env      # set MONGO_URI and MONGO_TRUTH_URI; LLM keys may stay empty
 cd frontend
 npm install
 Copy-Item .env.example .env.local   # VITE_API_URL=http://127.0.0.1:8000
+cd ..
 ```
 
-The API allows the UI origin through `CORS_ORIGINS` (default `http://localhost:5173` and `http://127.0.0.1:5173`). The settings loader also reads a `.env` in the repository root.
+There is a single `.env`, in the repository root. It is never committed, and real environment variables override it. `MONGO_URI` and `MONGO_TRUTH_URI` may point at the same cluster, since the truth data uses a separate database name. The API allows the UI origin through `CORS_ORIGINS` (default `http://localhost:5173` and `http://127.0.0.1:5173`).
 
 ## Run
 
-From `mulescope/`, in three terminals:
+From the repo root, in three terminals (the UI terminal starts in `frontend/`):
 
 ```powershell
 uv run seed --seed 42 --customers 300 --reset   # generate, load and detect (about a minute on Atlas)
@@ -133,15 +133,27 @@ The full-graph eval (`uv run evals --mode fallback`) also measures citation vali
 ## Repository layout
 
 ```
-mulescope/
-  backend/app/     api, services, graph, agents, domain, repositories, core
-  datagen/         synthetic data generator and planted scenarios
-  evals/           check-policy, smoke and the eval harness
-  config/          scoring, playbook, scenario and LLM settings (YAML)
-  frontend/        React + Vite + TypeScript analyst UI
+backend/app/       api, services, graph, agents, domain, repositories, llm, core
+  core/            settings, container, wiring, logging, errors, config loaders
+  domain/          enums, metrics, signals, scoring, disposition policy, action planner
+  repositories/    MongoDB access, one class per collection, collection setup
+  services/        detector, metrics, case runner, read models, action service
+  agents/          profiler, flow analyst, narrative writer, critic, tools, prompts
+  graph/           state, nodes, edges, builder, checkpointer
+  llm/             providers, client (cache, retries, semaphore), factory
+  api/             routers, schemas, error handling
+datagen/           personas, counterparties, ledger builder, scenarios, writers, validation
+evals/             check-policy, smoke and the eval harness
+config/            scoring, playbook, scenarios and llm YAML
+frontend/          React + Vite + TypeScript analyst UI
+tests/             early pytest files from the M0 spec run (not maintained, see PROGRESS.md)
 docs/              BUILD_PROMPT.md, the specification
 PROGRESS.md        build checklist, decisions and known gaps
 ```
+
+## Configuration
+
+Thresholds, weights, scenario parameters, model names and action rules live in `config/*.yaml`, not in code. Changing a signal weight or a playbook rule needs no code change; rerun `uv run check-policy` to see the effect on the 40 planted alerts.
 
 ## Known limits
 

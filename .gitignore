@@ -28,3 +28,9 @@ dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# uv / tooling extras
+.uv/
+.uv-cache/
+.coverage.*
+*.tsbuildinfo

@@ -37,6 +37,9 @@ async def run(verbose: bool) -> None:
         truth = [t async for t in truth_client[settings.mongo_truth_db_name].ground_truth.find().sort("scenario_type", 1)]
         alerts = {a["account_id"]: a async for a in db[Col.ALERTS].find()}
         svc = MetricsService(MongoTransactionRepository(db), MongoAccountRepository(db), MongoCustomerRepository(db), MongoComplaintRepository(db), cfg)
+        if not truth:
+            print(f"no ground truth in {settings.mongo_truth_db_name}; seed the dataset first (uv run seed --seed 42 --customers 300 --reset)")
+            return
         correct = 0
         mules_closed = 0
         confusion: Counter[tuple[str, str]] = Counter()
