@@ -11,7 +11,7 @@ smoke commands only, commit after each phase). Phases were built in the order 5,
 - [x] Phase 1: synthetic data and detector. Smoke: all 40 planted accounts alerted, 0 organic, seed ~55-70 s on Atlas.
 - [x] Phase 2: domain logic. Smoke: `uv run check-policy` 40/40 (100%), 0 mules closed.
 - [x] Phase 3: API and graph in fallback mode. Smoke: `uv run smoke` mule -> STR draft, seller -> Close, ~3 s per run, audit chains valid; resume after API restart verified.
-- [x] Phase 4: live LLM agents (Groq/Gemini providers, `llm_cache`, semaphore of 2, retry with backoff, schema repair, versioned prompts, per-node template fallback, critic code + LLM checks). Smoke: an offline check with a fake provider passed (429 retry, cache hit, invalid output -> template fallback, narrative guards, critic). `uv run smoke --mode live` was not run: no `.env` / Mongo and no Groq or Gemini key in this clone, so fallback stays on.
+- [x] Phase 4: live LLM agents (Groq/Gemini providers, `llm_cache`, semaphore of 2, retry with backoff, schema repair, versioned prompts, per-node template fallback, critic code + LLM checks). Smoke: an offline check with a fake provider passed (429 retry, cache hit, invalid output -> template fallback, narrative guards, critic). Later verified live on Groq after the live mode fixes: `uv run smoke --mode live` passes for both scenarios (under 6 s, critic pass, no fallback).
 - [x] Phase 5: analyst UI (React + Vite + TS, queue, case workspace, flow graph, agents stepper over SSE, actions, audit, diagnostics). Smoke: `npm run build` passes (tsc clean). Not yet clicked through against a live API: this clone has no `.env`, so the API cannot reach Mongo (see Known gaps).
 - [x] Phase 6: `uv run evals --mode fallback|live` (harness, resumable with `--resume`), Evals page, README. Smoke: CLI imports and `--help` parse. Not yet run end to end, because there is no `.env` / Mongo in this clone. First command once the `.env` is back: `uv run evals --mode fallback`.
 
@@ -28,7 +28,7 @@ Backend (`backend/app`):
 
 Data (`datagen`): personas engine (NumPy vectorised), counterparty pools, 5 scenario classes / 16 variants / 40 planted accounts, ledger builder (double entry, running balances, time-ordered transfer ids), writers, validation, `--preview`.
 
-Scripts: `uv run seed`, `uv run dev`, `uv run check-policy`, `uv run smoke`, `uv run evals` (stub).
+Scripts: `uv run seed`, `uv run dev`, `uv run check-policy`, `uv run smoke`, `uv run evals`.
 
 Frontend (`frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
 - `src/types/api.ts`: every API type in one hand-written file, mirroring `services/case_query.py`, the Mongo repositories and the graph node documents.
@@ -62,7 +62,7 @@ Frontend (`frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
 - Evals: `evals/harness.py` starts a run per planted case, auto-approves, and saves each result as soon as it is known (`_id = eval_run:case`). `--resume` (latest unfinished run of the mode) or `--resume EVAL-0003` skips cases already evaluated without error. A run stays `running` until all 40 are in without error. A case run left `running` by a dead process is marked failed and restarted.
 - Evals metrics: predicted is the case's policy disposition after the run. Citation validity is cited ids that exist in the run's evidence divided by all cited ids. Claim coverage uses the critic's claim-line rule. Fallback rate counts LLM-agent nodes that used the template. Latency is harness wall time per case, including the auto-approve resume.
 - `eval_results` store the scenario name, label and expected disposition so the Evals page can show per-scenario pass/fail. They are written only by the CLI, and no agent tool reads that collection. This deviates from "no answers inside" for eval results; the truth database stays the only source of labels.
-- README states that the weights were tuned on the seed-42 alerts (in-sample), that seed 7 is a synthetic-to-synthetic check, and that three mules scoring 65, 65 and 68 reach STR only through the caution band.
+- README states that the weights were tuned on the seed-42 alerts (in-sample), that seed 7 is a synthetic-to-synthetic check, and that the near-threshold mules reach STR only through the caution band (the list is in the results bullet further down).
 - LLM transport: Groq (OpenAI-compatible chat, `response_format: json_object`) and Gemini (`generateContent`, `responseMimeType: application/json`) over `httpx` (pinned 0.28.1, already in the lock through langchain-core), instead of two vendor SDKs. Structured output = JSON mode + Pydantic validation + one repair retry, not `with_structured_output` (no LangChain chat-model packages in the stack).
 - Models (`config/llm.yaml`, TODO verify): Groq `openai/gpt-oss-20b` for profiler, flow analyst and critic (Groq retired the Llama 3.x self-serve models in Aug 2026). The narrative was first on Gemini `gemini-3.8-flash`; see the live mode decisions below. Checked on the providers' model pages in Nov 2026.
 - Live agents wrap their templates: the template computes the deterministic facts (and runs the bounded tool calls for the flow analyst; the LLM does not choose tools), then the LLM adds one cited assessment fact and a structured finding. Any `LLMUnavailable` returns the template output with `fallback_used=true`. In live mode, an agent whose provider has no key stays template.
@@ -78,17 +78,32 @@ Frontend (`frontend`, React 19 + Vite 8 + TS 7 + Tailwind 4):
 - Stale action ids on a re-run are fixed by refreshing proposed actions (`refresh_proposed` sets `run_id` and `evidence_ids`) and by mapping the actions given to the narrative onto the current ledger (`with_current_evidence`). The run id is not in the idempotency key: it would create duplicate proposed actions, and `execute_actions` runs every proposed or approved action of the case, so a hold could run twice.
 - `strip_unknown_ids` removes `EVD-` ids that are not in the ledger from template and live narrative text.
 - Template narrative amounts fixed: the metric keys are prefixed `metric:`, and the template now strips the prefix, so it shows the real credits and debits instead of ₹0.
+- Critic `max_tokens` raised from 1200 to 3000. gpt-oss models spend completion tokens on reasoning before the JSON. At 1200 the longer mule reports used the whole budget, and Groq returned HTTP 400 `json_validate_failed` with an empty `failed_generation`.
+- `reasoning_effort: low` is set for all four agents (`config/llm.yaml`, passed in the Groq request body; Gemini ignores it). It keeps reasoning short, which cut token use and stopped the critic revise loop from hitting the Groq free-tier limit (about 8k tokens per minute per model). Token limits are now profiler 1500, flow analyst 1500, narrative 6000, critic 3000.
+- The fallback reason keeps the Groq error code, a `failed_generation` excerpt and the rate-limit numbers, so a 400 or 429 is diagnosable from Diagnostics.
+- UI: an EVD chip on an action whose `run_id` is an earlier run, with an id not in the current ledger, is shown neutral (dashed, "from an earlier run"). This is decided from the action's `run_id`, not by looking the id up, because there is no endpoint for older runs' evidence. Red is kept for ids that point at nothing in the current context.
+- UI money flow: each side shows its top 8 parties by amount plus one aggregate card ("30 other senders" with count and total). Clicking the card expands that side, and "Show top 8" collapses it. Party cards are compact two-line cards with 13 px names, and the graph fits near 0.9 zoom at 1440x900. Arrowheads are fixed-size.
+- Results as of this session:
+  - Live smoke: mule.classic and seller.shop under 6 s each, critic pass, no fallback.
+  - EVAL-0001 in fallback mode: 40/40, 0 mules closed, citation validity 100%, claim coverage 96.4%, 0 tipping-off, injection obeyed 0, latency p50 264 ms and p95 346 ms.
+  - EVAL-0001's fallback rate (94%) and token total are not reported in the README: two cases (CASE-0002, CASE-0019) had live runs waiting at the analyst gate, which the harness reused.
+  - Seed-42 near-threshold STR mules (score 65 to 69): ACC-375941 65, ACC-099424 68, ACC-970705 68, ACC-480243 68.
+- README rewritten with screenshots in `docs/images/` (queue, case-workspace, agents-live, report, actions-audit, diagnostics, evals), taken at 1440x900 with a throwaway Playwright script driving the installed Edge (not added to the project). MIT LICENSE added.
 
 ## Known gaps
 
 - An action cancelled or rejected in an earlier run still blocks a new proposal for the same key (the idempotency key is `case:type:target`).
 - Stored executed actions keep their first-run evidence ids. History is not rewritten, only the copy given to the narrative is mapped to the current ledger.
 - The node budget is a wall-clock limit on one structured call, not on the whole node including code and tool work.
-- Live LLM calls are unverified against the real Groq and Gemini APIs (no keys). The request/response mapping follows the public API shapes; the first live smoke may need small fixes, which fall back to templates meanwhile.
+- A full live eval of all 40 alerts has not been run. Live mode is verified on the two smoke scenarios and one UI run only. Gemini is not reachable from this machine, so the Gemini provider is unverified.
+- Money-flow expanded view shows at most the top 24 senders and 12 receivers, because the API caps the flow data; the rest stay in one "N more" card.
+- Executed actions shown in the UI keep their first-run evidence ids; the chips are marked "from an earlier run" from the action's `run_id`, not by looking the ids up.
+- No demo GIF in the README.
+- The `b90f8c2` commit ("show earlier-run evidence chips as neutral") also contains the `.kiro/specs/live-mode-fixes` files, which were already staged.
 - The flow analyst does not run an LLM-driven tool loop: the four read-only tools are called by code, and the LLM interprets the results.
 - No separate token-bucket rate limiter: the semaphore of 2 plus backoff honouring `Retry-After` is the only quota protection. A full live eval may still need several `--resume` sessions.
 - An earlier session of this clone had no `.env`, so `uv run dev` failed on the missing `MONGO_URI` and nothing could be checked against the live Atlas data. The UI types were checked against the backend code that builds each response, not against captured responses. Restore the `.env` and click through once.
-- UI not built: light theme, keyboard shortcuts, Playwright, generated OpenAPI types (all skipped by instruction); the Audit explorer and Settings screens; PAN/account "reveal on click" (the API only ever returns masked values). The diagnostics cache hit rate shows "n/a" until the LLM cache exists.
+- UI not built: light theme, keyboard shortcuts, Playwright tests, generated OpenAPI types (all skipped by instruction); the Audit explorer and Settings screens; PAN/account "reveal on click" (the API only ever returns masked values). The diagnostics "Cache hit rate" row reads "N / M LLM calls" and means N cache hits out of M calls.
 - Sender cards show party type and count, not sender account age and KYC type, because the entity strip read model does not carry them for external parties.
 - Separate reviewer gate (maker-checker for STR) skipped; one analyst gate only.
 - Most API responses are plain dicts, not dedicated response models.
