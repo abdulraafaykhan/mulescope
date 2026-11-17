@@ -32,8 +32,10 @@ def _error_text(resp: httpx.Response) -> str:
         error = resp.json()["error"]
         code = error.get("code") or error.get("type") or ""
         head = f"HTTP {resp.status_code} {code}".strip() + f": {str(error.get('message', ''))[:MESSAGE_MAX]}"
-        failed = error.get("failed_generation")
-        return f"{head}; failed_generation: {str(failed)[:FAILED_GENERATION_MAX]!r}" if failed else head
+        if "failed_generation" not in error:
+            return head
+        # An empty value is informative too: the model produced no JSON at all.
+        return f"{head}; failed_generation: {str(error['failed_generation'])[:FAILED_GENERATION_MAX]!r}"
     except (ValueError, KeyError, TypeError, AttributeError):
         return f"HTTP {resp.status_code}: {resp.text[:ERROR_BODY_MAX]}"
 
