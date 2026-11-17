@@ -3,8 +3,12 @@
 ``LlmClient.structured`` is the only way agents reach a model:
 
 1. Look up ``llm_cache`` by ``sha256(model, prompt_version, system, user)``.
-2. Otherwise try the primary model, then `fallback_model`; each takes the global semaphore (``limits.max_concurrency``), call the
-   provider and retry retryable errors with exponential backoff.
+2. Otherwise try the primary model, then `fallback_model`. Each call takes the
+   global semaphore (``limits.max_concurrency``) and then runs under a
+   wall-clock limit (``call_timeout_seconds``), with at most ``max_attempts``
+   tries and capped backoff. A timeout, or a ``Retry-After`` longer than the
+   backoff cap or the remaining budget, moves on to the next model. The whole
+   structured call is limited by ``node_budget_seconds``.
 3. Parse the JSON and validate it into the agent's Pydantic schema; on a
    mismatch, ask once more with the validation error (repair), then give up.
 4. Cache the validated output and report tokens, retries and cache hits.
@@ -96,6 +100,17 @@ class LlmClient:
         provider = self._providers.get(route.provider.value)
         if provider is None:
             raise LLMUnavailable(f"{route.provider.value}/{route.model}: provider is not configured")
+        budget = self._limits.node_budget_seconds
+        try:
+            async with asyncio.timeout(budget) as scope:
+                deadline = scope.when() or 0.0
+                return await self._structured_in_budget(provider, route, prompt_version, system, user, schema, meta, deadline)
+        except TimeoutError as exc:
+            meta.errors.append(f"{provider.name}/{route.model}: node budget {budget:g}s spent")
+            raise LLMUnavailable(f"{provider.name}/{route.model}: node budget {budget:g}s spent", detail={"errors": meta.errors}) from exc
+
+    async def _structured_in_budget(self, provider: LLMProvider, route: AgentModelConfig, prompt_version: str, system: str, user: str, schema: type[SchemaT], meta: CallMeta, deadline: float) -> tuple[SchemaT, CallMeta]:
+        """Cache lookup, then each model in turn; runs inside the node budget."""
         key = cache_key(route.model, prompt_version, system, user)
         if self._cache is not None and (hit := await self._cache.get(key)):
             meta.cache_hit = True
@@ -103,7 +118,7 @@ class LlmClient:
 
         models = [route.model] + ([route.fallback_model] if route.fallback_model else [])
         for model in models:
-            parsed = await self._try_model(provider, route, model, system, user, schema, meta)
+            parsed = await self._try_model(provider, route, model, system, user, schema, meta, deadline)
             if parsed is None:
                 continue
             if self._cache is not None:
@@ -111,7 +126,7 @@ class LlmClient:
             return parsed, meta
         raise LLMUnavailable(f"{provider.name}/{models[-1]}: no model answered", detail={"errors": meta.errors})
 
-    async def _try_model(self, provider: LLMProvider, route: AgentModelConfig, model: str, system: str, user: str, schema: type[SchemaT], meta: CallMeta) -> SchemaT | None:
+    async def _try_model(self, provider: LLMProvider, route: AgentModelConfig, model: str, system: str, user: str, schema: type[SchemaT], meta: CallMeta, deadline: float) -> SchemaT | None:
         """Run the call and repair loop on one model; ``None`` means try the next model.
 
         Errors are appended to ``meta.errors`` with a ``provider/model`` prefix.
@@ -120,7 +135,7 @@ class LlmClient:
         for attempt in range(self._limits.repair_attempts + 1):
             request = LlmRequest(system, message, model, route.temperature or 0.0, route.max_tokens)
             try:
-                text = await self._call(provider, request, meta)
+                text = await self._call(provider, request, meta, deadline)
             except LLMUnavailable:
                 return None
             try:
@@ -133,26 +148,48 @@ class LlmClient:
             return parsed
         return None
 
-    async def _call(self, provider: LLMProvider, request: LlmRequest, meta: CallMeta) -> str:
+    async def _call(self, provider: LLMProvider, request: LlmRequest, meta: CallMeta, deadline: float) -> str:
+        """One call with at most ``max_attempts`` tries; ``deadline`` is the node budget end.
+
+        The call limit starts after the semaphore is taken, so waiting for a
+        slot never shortens it (the node budget still covers the wait).
+
+        Raises:
+            LLMUnavailable: Timeout, non-retryable error, attempts used up, or a
+                ``Retry-After`` longer than the backoff cap or the remaining budget.
+        """
         label = f"{provider.name}/{request.model}"
+        call_limit = self._limits.call_timeout_seconds
+        backoff_cap = self._limits.backoff_max_seconds
         delay = self._limits.backoff_base_seconds
-        for attempt in range(self._limits.max_retries + 1):
+        last_attempt = self._limits.max_attempts - 1
+        loop = asyncio.get_running_loop()
+        for attempt in range(self._limits.max_attempts):
             try:
                 async with self._sem:
-                    resp = await provider.complete(request)
+                    async with asyncio.timeout(call_limit):
+                        resp = await provider.complete(request)
                 meta.tokens_in += resp.tokens_in
                 meta.tokens_out += resp.tokens_out
                 return resp.text
+            except TimeoutError as exc:
+                # A second wait on a slow model would leave no time for the fallback model.
+                meta.errors.append(f"{label}: timeout after {call_limit:g}s")
+                raise LLMUnavailable(f"{label}: timeout after {call_limit:g}s") from exc
             except ProviderError as exc:
                 meta.errors.append(f"{label}: {exc}"[:200])
-                if not exc.retryable or attempt == self._limits.max_retries:
+                remaining = deadline - loop.time()
+                too_long = exc.retry_after is not None and (exc.retry_after > backoff_cap or exc.retry_after > remaining)
+                wait = min(exc.retry_after if exc.retry_after is not None else delay, backoff_cap)
+                if not exc.retryable or attempt == last_attempt or too_long or wait >= remaining:
+                    # Not retryable, out of attempts, or waiting is not worth it: next model.
                     raise LLMUnavailable(f"{label} failed: {exc}"[:300]) from exc
                 meta.retries += 1
-                wait = min(exc.retry_after or delay, self._limits.backoff_max_seconds)
                 _logger.warning("llm retry", extra={"provider": provider.name, "attempt": attempt + 1, "wait_s": wait})
                 await asyncio.sleep(wait)
-                delay = min(delay * 2, self._limits.backoff_max_seconds)
+                delay = min(delay * 2, backoff_cap)
         raise LLMUnavailable(f"{label} failed")
+
     async def aclose(self) -> None:
         for p in self._providers.values():
             await p.aclose()

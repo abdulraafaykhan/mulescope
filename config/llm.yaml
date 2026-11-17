@@ -57,10 +57,15 @@ agents:
 # Free-tier protection: one global semaphore across all agents.
 limits:
   max_concurrency: 2
-  timeout_seconds: 60
-  max_retries: 3
+  # Wall-clock limit per provider call; starts after the semaphore is taken.
+  call_timeout_seconds: 20
+  # Attempts per call and model. A timeout is not retried on the same model.
+  max_attempts: 2
+  # Wall-clock limit per node: all attempts, the fallback model and the repair.
+  node_budget_seconds: 40
   backoff_base_seconds: 2
-  backoff_max_seconds: 30
+  # A longer Retry-After skips to the next model instead of waiting.
+  backoff_max_seconds: 5
   # One repair attempt when the output does not match the schema, then fall back.
   repair_attempts: 1
 

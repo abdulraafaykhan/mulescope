@@ -24,7 +24,8 @@ def build_agent_suite(*, llm_mode: str, cfg: LlmConfig, groq_key: str | None, ge
     """Return the template suite (fallback) or the live suite (live with keys)."""
     if llm_mode != "live":
         return AgentSuite()
-    timeout = cfg.limits.timeout_seconds
+    # Safety net only: LlmClient enforces the wall-clock limit with asyncio.timeout.
+    timeout = cfg.limits.call_timeout_seconds
     providers: dict[str, LLMProvider] = {}
     if groq_key:
         providers["groq"] = GroqProvider(groq_key, cfg.providers.groq.base_url, timeout)

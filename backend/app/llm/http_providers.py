@@ -2,8 +2,9 @@
 
 Groq exposes an OpenAI-compatible chat endpoint; we ask for a JSON object.
 Gemini's ``generateContent`` is asked for ``application/json``. Both map HTTP
-429, 408 and 5xx (and timeouts) to a retryable ``ProviderError`` and honour
-``Retry-After``. Base URLs come from ``config/llm.yaml``; keys from settings.
+429, 408 and 5xx (and transport errors) to a retryable ``ProviderError`` and
+honour ``Retry-After``. A timeout is a non-retryable ``ProviderError``. Base
+URLs come from ``config/llm.yaml``; keys from settings.
 """
 
 from __future__ import annotations
@@ -28,7 +29,10 @@ def _retry_after(resp: httpx.Response) -> float | None:
 async def _post(client: httpx.AsyncClient, url: str, body: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
     try:
         resp = await client.post(url, json=body, headers=headers)
-    except (httpx.TimeoutException, httpx.TransportError) as exc:
+    except httpx.TimeoutException as exc:
+        # Not retryable: LlmClient moves to the next model after a timeout.
+        raise ProviderError(f"timeout: {type(exc).__name__}", retryable=False) from exc
+    except httpx.TransportError as exc:
         raise ProviderError(f"transport error: {type(exc).__name__}", retryable=True) from exc
     if resp.status_code >= 400:
         # Error bodies can be long; keep the start for diagnostics, never the request.

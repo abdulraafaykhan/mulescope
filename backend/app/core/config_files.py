@@ -141,18 +141,24 @@ class LimitsConfig(_ConfigModel):
 
     Attributes:
         max_concurrency: Global semaphore size across all LLM calls.
-        timeout_seconds: Per-request HTTP timeout.
-        max_retries: Retries on rate limits, timeouts and 5xx before falling back.
+        call_timeout_seconds: Wall-clock limit for one provider call. It starts
+            after the semaphore is taken, so queueing does not eat into it.
+        max_attempts: Attempts per call and model (first try plus retries) on
+            rate limits and 5xx. A timeout is never retried on the same model.
+        node_budget_seconds: Wall-clock limit for one structured call, covering
+            every attempt, the fallback model and the repair attempt.
         backoff_base_seconds: First backoff delay; doubles per retry.
-        backoff_max_seconds: Upper bound for one backoff delay.
+        backoff_max_seconds: Upper bound for one backoff delay. A longer
+            ``Retry-After`` moves on to the next model instead of waiting.
         repair_attempts: Extra calls when the output fails schema validation.
     """
 
     max_concurrency: int = Field(default=2, gt=0)
-    timeout_seconds: float = Field(default=60, gt=0)
-    max_retries: int = Field(default=3, ge=0)
+    call_timeout_seconds: float = Field(default=20, gt=0)
+    max_attempts: int = Field(default=2, gt=0)
+    node_budget_seconds: float = Field(default=40, gt=0)
     backoff_base_seconds: float = Field(default=2, ge=0)
-    backoff_max_seconds: float = Field(default=30, ge=0)
+    backoff_max_seconds: float = Field(default=5, ge=0)
     repair_attempts: int = Field(default=1, ge=0)
 
 
