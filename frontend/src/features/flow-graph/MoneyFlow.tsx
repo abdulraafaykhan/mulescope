@@ -7,7 +7,7 @@
  * the account drawer, and the time slider replays the window.
  */
 import { useMemo, useState } from "react";
-import { Background, Controls, MarkerType, MiniMap, ReactFlow, type Edge } from "@xyflow/react";
+import { Background, Controls, MarkerType, MiniMap, Position, ReactFlow, type Edge } from "@xyflow/react";
 import dagre from "@dagrejs/dagre";
 import { useCase, useFlow } from "../../lib/queries";
 import type { FlowEdge, FlowNode } from "../../types/api";
@@ -23,6 +23,25 @@ const SLIDER_STEPS = 100;
 // Tight spacing so nine cards per column fit the pane at 1440x900 near 1:1 zoom.
 const NODE_SEP = 8;
 const RANK_SEP = 80;
+// React Flow's default handle is a 6 px square centred on the card edge.
+const HANDLE = 6;
+const FIT_VIEW = { padding: 0.04, maxZoom: 1.1 };
+
+/**
+ * Size and handle bounds given up front. Why: hover and replay rebuild the
+ * node objects; without these React Flow drops its measurements, hides every
+ * node until it measures again, the pointer "leaves" the hidden node, and the
+ * graph flickers. Zoom and fit also misbehave while nodes are unmeasured.
+ */
+function geometry(role: FlowNode["role"]): Pick<AccountFlowNode, "width" | "height" | "measured" | "handles"> {
+  const [width, height] = role === "mule" ? [MULE_W, MULE_H] : [PARTY_W, PARTY_H];
+  const y = height / 2 - HANDLE / 2;
+  const handles: NonNullable<AccountFlowNode["handles"]> = [];
+  if (role !== "sender") handles.push({ type: "target", position: Position.Left, x: -HANDLE / 2, y, width: HANDLE, height: HANDLE });
+  if (role !== "receiver") handles.push({ type: "source", position: Position.Right, x: width - HANDLE / 2, y, width: HANDLE, height: HANDLE });
+  // fitView (and the fit button) only frames nodes with a measured size.
+  return { width, height, measured: { width, height }, handles };
+}
 
 function layout(nodes: FlowNode[], edges: FlowEdge[]): Map<string, { x: number; y: number }> {
   const g = new dagre.graphlib.Graph();
@@ -42,7 +61,7 @@ function layout(nodes: FlowNode[], edges: FlowEdge[]): Map<string, { x: number; 
 function Legend() {
   const items: [string, string][] = [["< 30 min", exitColor(10)], ["< 90 min", exitColor(60)], ["< 1 day", exitColor(600)], ["slower", exitColor(5000)]];
   return (
-    <div className="flex items-center gap-3 text-[11px] text-muted">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
       <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-role-sender" />sender</span>
       <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-role-mule" />flagged</span>
       <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-role-receiver" />receiver</span>
@@ -79,6 +98,7 @@ export default function MoneyFlow({ caseId }: { caseId: string }) {
       id: n.id,
       type: "account",
       position: positions.get(n.id) ?? { x: 0, y: 0 },
+      ...geometry(n.role),
       draggable: false,
       data: { flow: n, dimmed: !visible(n.first_ts) || !onPath(n.id), ageDays: n.role === "mule" ? ageDays(n.opened_at, startMs) : null, internal: isInternalAccount(n.ref), aggregate: view.aggregates.has(n.id) },
     }));
@@ -118,8 +138,9 @@ export default function MoneyFlow({ caseId }: { caseId: string }) {
           edges={edges}
           nodeTypes={NODE_TYPES}
           fitView
-          fitViewOptions={{ padding: 0.04, maxZoom: 1.1 }}
+          fitViewOptions={FIT_VIEW}
           minZoom={0.2}
+          maxZoom={2.5}
           proOptions={{ hideAttribution: true }}
           nodesConnectable={false}
           onNodeMouseEnter={(_, n) => setHover(n.id)}
@@ -136,7 +157,7 @@ export default function MoneyFlow({ caseId }: { caseId: string }) {
           }}
         >
           <Background color="var(--c-border)" gap={24} />
-          <Controls showInteractive={false} position="bottom-right" />
+          <Controls showInteractive={false} position="bottom-right" fitViewOptions={FIT_VIEW} aria-label="Zoom in, zoom out, fit the graph" />
           {anyExpanded && <MiniMap pannable zoomable position="top-right" nodeColor={(n) => `var(--c-role-${(n as AccountFlowNode).data.flow.role})`} maskColor="rgba(11,15,26,0.7)" />}
         </ReactFlow>
       </div>
@@ -147,15 +168,16 @@ export default function MoneyFlow({ caseId }: { caseId: string }) {
           <input type="range" min={0} max={SLIDER_STEPS} value={step} onChange={(e) => setStep(Number(e.target.value))} className="min-w-0 flex-1 accent-[var(--c-accent)]" aria-label="Replay the alert window" />
           <span className="num w-32 shrink-0 text-right text-muted">{step >= SLIDER_STEPS ? "full window" : istDateTime(new Date(cutoff).toISOString())}</span>
         </label>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <Legend />
           <div className="flex shrink-0 items-center gap-2">
             {anyExpanded && (
               <Button size="sm" variant="ghost" onClick={() => setExpanded({ sender: false, receiver: false })}>Show top 8</Button>
             )}
-            <span className="num text-xs text-muted">in {inrShort(view.nodes.find((n) => n.role === "mule")?.amount)}</span>
+            <span className="num text-xs whitespace-nowrap text-muted">total in {inrShort(view.nodes.find((n) => n.role === "mule")?.amount)}</span>
           </div>
         </div>
+        <p className="text-[11px] text-muted">Scroll to zoom, drag to move, double-click to zoom in. Hover a card to trace its path.</p>
       </div>
     </div>
   );

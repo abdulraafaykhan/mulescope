@@ -89,6 +89,25 @@ export function minutes(value: number | null | undefined): string {
   return `${(value / 1440).toFixed(1)} d`;
 }
 
+const usdCents = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const usdTiny = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumSignificantDigits: 2 });
+const USD_TINY = 0.01;
+
+/** Estimated USD: `$0.0123`; sub-cent amounts keep two significant digits (`$0.00014`). */
+export function usd(value: number | null | undefined): string {
+  if (value == null) return "—";
+  if (value === 0) return "$0.00";
+  return Math.abs(value) < USD_TINY ? usdTiny.format(value) : usdCents.format(value);
+}
+
+/** Compact integer for chart axes: `12.4k`, `1.2M`. */
+export function intCompact(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `${(value / 1e3).toFixed(1)}k`;
+  return value.toFixed(0);
+}
+
 export function ms(value: number | null | undefined): string {
   if (value == null) return "—";
   return value >= 1000 ? `${(value / 1000).toFixed(2)} s` : `${value} ms`;

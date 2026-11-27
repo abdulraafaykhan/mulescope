@@ -70,7 +70,9 @@ class Container:
         timeout = s.mongo_server_selection_timeout_ms
         self._client = AsyncMongoClient(uri, serverSelectionTimeoutMS=timeout, tz_aware=True)
         self._db = self._client[s.mongo_db_name]
-        await ensure_collections(self._db, self.llm_config.cache_ttl_seconds)
+        await ensure_collections(
+            self._db, self.llm_config.cache_ttl_seconds, self.llm_config.call_log_ttl_seconds
+        )
 
         # MongoDBSaver creates its indexes in __init__ (blocking I/O), so keep it off the loop.
         def _build_saver() -> tuple[MongoClient[Any], Any]:

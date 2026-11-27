@@ -40,6 +40,8 @@ __all__ = [
     "LimitsConfig",
     "LlmConfig",
     "LlmProvider",
+    "ModelPriceConfig",
+    "ObservabilityConfig",
     "ProviderConfig",
     "ProvidersConfig",
     "load_llm_config",
@@ -166,6 +168,30 @@ class LimitsConfig(_ConfigModel):
     repair_attempts: int = Field(default=1, ge=0)
 
 
+class ModelPriceConfig(_ConfigModel):
+    """List price and free-tier rate limit of one model, for estimates only.
+
+    Attributes:
+        input_usd_per_million: USD per million prompt tokens.
+        output_usd_per_million: USD per million completion tokens.
+        tokens_per_minute: Free-tier tokens-per-minute limit, or ``None`` when unknown.
+    """
+
+    input_usd_per_million: float = Field(ge=0)
+    output_usd_per_million: float = Field(ge=0)
+    tokens_per_minute: int | None = Field(default=None, gt=0)
+
+
+class ObservabilityConfig(_ConfigModel):
+    """LLM call log settings.
+
+    Attributes:
+        call_log_ttl_days: Retention of ``llm_calls`` documents, in days.
+    """
+
+    call_log_ttl_days: int = Field(gt=0)
+
+
 class LlmConfig(_ConfigModel):
     """Validated contents of ``config/llm.yaml``.
 
@@ -174,6 +200,9 @@ class LlmConfig(_ConfigModel):
         providers: Per-provider settings.
         agents: Per-agent model routing.
         cache: LLM response cache settings.
+        models: Price and rate limit per model name. A model missing here has
+            no estimated cost.
+        observability: LLM call log settings.
     """
 
     version: str = Field(min_length=1)
@@ -181,6 +210,8 @@ class LlmConfig(_ConfigModel):
     agents: AgentsConfig
     limits: LimitsConfig = LimitsConfig()
     cache: CacheConfig
+    models: dict[str, ModelPriceConfig] = Field(default_factory=dict)
+    observability: ObservabilityConfig
 
     @property
     def cache_ttl_seconds(self) -> int:
@@ -192,6 +223,11 @@ class LlmConfig(_ConfigModel):
             The cache retention in whole seconds.
         """
         return int(timedelta(days=self.cache.ttl_days).total_seconds())
+
+    @property
+    def call_log_ttl_seconds(self) -> int:
+        """Return the ``llm_calls`` TTL in seconds, from ``observability.call_log_ttl_days``."""
+        return int(timedelta(days=self.observability.call_log_ttl_days).total_seconds())
 
 
 def load_yaml_model[ModelT: BaseModel](path: Path, model: type[ModelT]) -> ModelT:

@@ -63,7 +63,12 @@ async def _post(client: httpx.AsyncClient, url: str, body: dict[str, Any], heade
         raise ProviderError(f"transport error: {type(exc).__name__}", retryable=True) from exc
     if resp.status_code >= 400:
         # Error bodies can be long; keep the start for diagnostics, never the request.
-        raise ProviderError(_error_text(resp), retryable=resp.status_code in RETRYABLE_STATUS, retry_after=_retry_after(resp))
+        raise ProviderError(
+            _error_text(resp),
+            retryable=resp.status_code in RETRYABLE_STATUS,
+            retry_after=_retry_after(resp),
+            status=resp.status_code,
+        )
     data: dict[str, Any] = resp.json()
     return data
 

@@ -7,6 +7,7 @@ exist. Also used by scripts (``uv run smoke``) through ``build_app_objects``.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from backend.app.core.clock import Clock, SystemClock
@@ -39,6 +40,7 @@ from backend.app.repositories.mongo.case_records_repo import (
 )
 from backend.app.repositories.mongo.cases_repo import MongoCaseRepository
 from backend.app.repositories.mongo.llm_cache_repo import MongoLlmCacheRepository
+from backend.app.repositories.mongo.llm_calls_repo import MongoLlmCallRepository
 from backend.app.repositories.mongo.transactions_repo import MongoTransactionRepository
 from backend.app.services.action_service import ActionService
 from backend.app.services.case_query import CaseQueryService
@@ -46,6 +48,7 @@ from backend.app.services.case_runner import CaseRunner
 from backend.app.services.detection import PassThroughDetector
 from backend.app.services.event_bus import RunEventBus
 from backend.app.services.metrics_service import MetricsService
+from backend.app.services.observability_service import ObservabilityService
 
 if TYPE_CHECKING:
     from pymongo.asynchronous.database import AsyncDatabase
@@ -68,6 +71,7 @@ class AppObjects:
     evals: MongoEvalRepository
     alerts: MongoAlertRepository
     counterparties: MongoCounterpartyRepository
+    observability: ObservabilityService
 
 
 def build_app_objects(
@@ -82,9 +86,18 @@ def build_app_objects(
     clock = clock or SystemClock()
     scoring = load_scoring_config(config_dir)
     playbook = load_playbook_config(config_dir)
+    llm_cfg = llm_config or load_llm_config(config_dir)
+    llm_calls = MongoLlmCallRepository(db)
     agents = build_agent_suite(
-        llm_mode=llm_mode, cfg=llm_config or load_llm_config(config_dir), groq_key=groq_key, gemini_key=gemini_key,
-        cache=MongoLlmCacheRepository(db), clock=clock, str_sections=list(playbook.str_required_sections), tipping_terms=list(playbook.tipping_off_terms),
+        llm_mode=llm_mode,
+        cfg=llm_cfg,
+        groq_key=groq_key,
+        gemini_key=gemini_key,
+        cache=MongoLlmCacheRepository(db),
+        call_log=llm_calls,
+        clock=clock,
+        str_sections=list(playbook.str_required_sections),
+        tipping_terms=list(playbook.tipping_off_terms),
     )
     tx = MongoTransactionRepository(db)
     accounts, customers, complaints = MongoAccountRepository(db), MongoCustomerRepository(db), MongoComplaintRepository(db)
@@ -95,7 +108,7 @@ def build_app_objects(
         clock=clock, scoring=scoring, playbook=playbook, metrics=MetricsService(tx, accounts, customers, complaints, scoring), tx=tx,
         accounts=accounts, customers=customers, complaints=complaints, alerts=alerts, cases=cases, counters=MongoCounterRepository(db),
         evidence=MongoEvidenceRepository(db), reports=MongoReportRepository(db), actions=MongoActionRepository(db), decisions=MongoDecisionRepository(db),
-        runs=runs, node_execs=node_execs, audit=audit, agents=agents,
+        runs=runs, node_execs=node_execs, llm_calls=llm_calls, audit=audit, agents=agents,
     )
     graph = build_graph(checkpointer)
     bus = RunEventBus()
@@ -105,6 +118,10 @@ def build_app_objects(
         deps=deps, graph=graph, runner=runner, query=query, actions=ActionService(deps.actions, audit, clock),
         detector=PassThroughDetector(tx, alerts, cases, scoring, playbook, clock), bus=bus, audit=audit, evals=MongoEvalRepository(db), alerts=alerts,
         counterparties=MongoCounterpartyRepository(db),
+        observability=ObservabilityService(
+            calls=llm_calls, runs=runs, node_execs=node_execs, models=llm_cfg.models,
+            retention=timedelta(seconds=llm_cfg.call_log_ttl_seconds), clock=clock,
+        ),
     )
 
 

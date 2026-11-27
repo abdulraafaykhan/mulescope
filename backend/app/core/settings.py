@@ -99,7 +99,9 @@ class BaseAppSettings(BaseSettings):
     mongo_db_name: str = Field(default="mulescope", min_length=1)
     groq_api_key: SecretStr | None = None
     gemini_api_key: SecretStr | None = None
-    llm_mode: LlmMode = LlmMode.FALLBACK
+    # Live by default: agents call the LLM and fall back to their template per
+    # call on any failure, or entirely when no provider key is set.
+    llm_mode: LlmMode = LlmMode.LIVE
     as_of_date: date = DEFAULT_AS_OF_DATE
     checkpoint_ttl_days: int = Field(default=7, gt=0)
     mongo_server_selection_timeout_ms: int = Field(default=5000, gt=0)
@@ -147,7 +149,7 @@ class ApiSettings(BaseAppSettings):
 
     api_host: str = Field(default="127.0.0.1", min_length=1)
     api_port: int = Field(default=8000, gt=0, lt=65536)
-    cors_origins: tuple[str, ...] = ("http://localhost:5173", "http://127.0.0.1:5173")
+    cors_origins: tuple[str, ...] = ("http://localhost:5190", "http://127.0.0.1:5190", "http://localhost:5173", "http://127.0.0.1:5173")
 
 
 class _TruthSettingsMixin(BaseAppSettings):

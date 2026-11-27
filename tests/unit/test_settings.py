@@ -79,7 +79,7 @@ def test_defaults() -> None:
     settings = ApiSettings(_env_file=None)
     assert settings.mongo_uri.get_secret_value() == FAKE_MONGO_URI
     assert settings.mongo_db_name == "mulescope"
-    assert settings.llm_mode is LlmMode.FALLBACK
+    assert settings.llm_mode is LlmMode.LIVE
     assert settings.checkpoint_ttl_days == 7
     assert settings.groq_api_key is None
     assert settings.gemini_api_key is None

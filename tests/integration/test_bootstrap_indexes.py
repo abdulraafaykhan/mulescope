@@ -63,7 +63,10 @@ from backend.app.repositories.mongo.validators_m1 import M1_VALIDATORS
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio(loop_scope="module")]
 
 LLM_CACHE_TTL_SECONDS: Final[int] = load_llm_config(CONFIG_DIR).cache_ttl_seconds
-OPERATIONAL_PLAN: Final[tuple[IndexSpec, ...]] = operational_index_plan(LLM_CACHE_TTL_SECONDS)
+LLM_CALL_TTL_SECONDS: Final[int] = load_llm_config(CONFIG_DIR).call_log_ttl_seconds
+OPERATIONAL_PLAN: Final[tuple[IndexSpec, ...]] = operational_index_plan(
+    LLM_CACHE_TTL_SECONDS, LLM_CALL_TTL_SECONDS
+)
 
 DOCUMENT_VALIDATION_FAILURE: Final[int] = 121
 """MongoDB error code for a ``$jsonSchema`` rejection."""
@@ -95,7 +98,7 @@ EXPECTED_PREFIX: Final[Mapping[str, IdPrefix]] = {
     Col.DECISIONS: IdPrefix.DECISION,
 }
 OBJECT_ID_COLLECTIONS: Final[frozenset[str]] = frozenset(
-    {Col.TRANSACTIONS, Col.AUDIT_LOGS, Col.NODE_EXECUTIONS}
+    {Col.TRANSACTIONS, Col.AUDIT_LOGS, Col.NODE_EXECUTIONS, Col.LLM_CALLS}
 )
 STRING_ID_COLLECTIONS: Final[frozenset[str]] = frozenset(
     {Col.LLM_CACHE, Col.EVAL_RUNS, Col.EVAL_RESULTS, Col.DATASET_META}
@@ -165,7 +168,7 @@ def _key_pairs(info: Mapping[str, Any]) -> list[tuple[str, int]]:
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def bootstrapped_db(test_db: AsyncDatabase[Any]) -> AsyncIterator[AsyncDatabase[Any]]:
     """Run ``ensure_collections`` once on the module test database."""
-    await ensure_collections(test_db, LLM_CACHE_TTL_SECONDS)
+    await ensure_collections(test_db, LLM_CACHE_TTL_SECONDS, LLM_CALL_TTL_SECONDS)
     yield test_db
 
 
@@ -198,11 +201,16 @@ async def test_planned_index_exists(spec: IndexSpec, index_info: dict[str, dict[
     _assert_index_matches(spec, index_info[spec.collection])
 
 
-async def test_llm_cache_ttl_matches_config(index_info: dict[str, dict[str, Any]]) -> None:
+async def test_ttls_match_config(index_info: dict[str, dict[str, Any]]) -> None:
     ttl_specs = [s for s in OPERATIONAL_PLAN if s.ttl_seconds is not None]
-    assert [(s.collection, s.keys[0][0]) for s in ttl_specs] == [(Col.LLM_CACHE, "created_at")]
-    info = index_info[Col.LLM_CACHE][ttl_specs[0].name]
-    assert int(info["expireAfterSeconds"]) == LLM_CACHE_TTL_SECONDS
+    assert [(s.collection, s.keys[0][0]) for s in ttl_specs] == [
+        (Col.LLM_CACHE, "created_at"),
+        (Col.LLM_CALLS, "created_at"),
+    ]
+    expected = {Col.LLM_CACHE: LLM_CACHE_TTL_SECONDS, Col.LLM_CALLS: LLM_CALL_TTL_SECONDS}
+    for spec in ttl_specs:
+        info = index_info[spec.collection][spec.name]
+        assert int(info["expireAfterSeconds"]) == expected[spec.collection]
 
 
 async def test_expected_id_table_covers_every_collection() -> None:

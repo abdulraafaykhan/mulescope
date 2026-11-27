@@ -4,7 +4,7 @@
  */
 import { NavLink, Outlet } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, FlaskConical, ListChecks, ScanSearch } from "lucide-react";
+import { Activity, FlaskConical, Gauge, ListChecks, ScanSearch } from "lucide-react";
 import { fetchHealth } from "../lib/api";
 import { usePublicConfig } from "../lib/queries";
 import { Chip } from "../components/ui/chips";
@@ -33,6 +33,9 @@ export function Layout() {
             </NavLink>
             <NavLink to="/evals" className={navClass}>
               <FlaskConical size={14} aria-hidden /> Evals
+            </NavLink>
+            <NavLink to="/observability" className={navClass}>
+              <Gauge size={14} aria-hidden /> Observability
             </NavLink>
           </nav>
         </div>

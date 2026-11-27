@@ -6,6 +6,6 @@ import { defineConfig } from "vite";
 // which is the origin the API allows through CORS.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { port: 5173, strictPort: true },
+  server: { port: 5190, strictPort: true },
   build: { chunkSizeWarningLimit: 900 },
 });

@@ -31,6 +31,7 @@ class OperationalCollection(StrEnum):
     DECISIONS = "decisions"
     AUDIT_LOGS = "audit_logs"
     LLM_CACHE = "llm_cache"
+    LLM_CALLS = "llm_calls"
     EVAL_RUNS = "eval_runs"
     EVAL_RESULTS = "eval_results"
     DATASET_META = "dataset_meta"

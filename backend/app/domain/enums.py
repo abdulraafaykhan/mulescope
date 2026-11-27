@@ -130,6 +130,35 @@ class CaseStatus(StrEnum):
 
 
 @unique
+class LlmCallOutcome(StrEnum):
+    """Result of one LLM call attempt, as stored in ``llm_calls``.
+
+    ``OK`` and ``CACHE_HIT`` count as success; every other value is a failed
+    attempt. ``CACHE_HIT`` makes no provider call and spends no tokens.
+    """
+
+    OK = "ok"
+    CACHE_HIT = "cache_hit"
+    INVALID_OUTPUT = "invalid_output"
+    RATE_LIMITED = "rate_limited"
+    PROVIDER_ERROR = "provider_error"
+    TIMEOUT = "timeout"
+    BUDGET_EXCEEDED = "budget_exceeded"
+
+
+@unique
+class ObservabilityPeriod(StrEnum):
+    """Time ranges of the observability page.
+
+    ``ALL`` covers everything still retained by the ``llm_calls`` TTL.
+    """
+
+    DAY = "24h"
+    WEEK = "7d"
+    ALL = "all"
+
+
+@unique
 class Direction(StrEnum):
     """Side of a ledger entry."""
 

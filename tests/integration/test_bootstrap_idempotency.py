@@ -42,6 +42,7 @@ DEFAULT_ID_INDEX = "_id_"
 """Name of the index MongoDB creates on ``_id`` for every collection."""
 
 LLM_CACHE_TTL_SECONDS = load_llm_config(CONFIG_DIR).cache_ttl_seconds
+LLM_CALL_TTL_SECONDS = load_llm_config(CONFIG_DIR).call_log_ttl_seconds
 
 Snapshot = dict[str, dict[str, Any]]
 """Collection name -> ``index_information()`` of that collection."""
@@ -74,7 +75,7 @@ async def _snapshot(db: AsyncDatabase[Any]) -> Snapshot:
 def _expected_index_names() -> dict[str, set[str]]:
     """Return the index names the plan requires per operational collection."""
     expected: dict[str, set[str]] = {name: {DEFAULT_ID_INDEX} for name in OPERATIONAL_VALIDATORS}
-    for spec in operational_index_plan(LLM_CACHE_TTL_SECONDS):
+    for spec in operational_index_plan(LLM_CACHE_TTL_SECONDS, LLM_CALL_TTL_SECONDS):
         expected[spec.collection].add(spec.name)
     return expected
 
@@ -85,7 +86,7 @@ async def test_repeated_bootstrap_is_identical(fresh_db: FreshDb, runs: int) -> 
     async with fresh_db() as db:
         snapshots: list[Snapshot] = []
         for _ in range(runs):
-            await ensure_collections(db, LLM_CACHE_TTL_SECONDS)
+            await ensure_collections(db, LLM_CACHE_TTL_SECONDS, LLM_CALL_TTL_SECONDS)
             snapshots.append(await _snapshot(db))
 
     first = snapshots[0]
@@ -108,7 +109,7 @@ async def test_existing_collection_without_validator_gets_it(fresh_db: FreshDb) 
         before_options = (await before.to_list())[0].get("options", {})
         assert "validator" not in before_options
 
-        await ensure_collections(db, LLM_CACHE_TTL_SECONDS)
+        await ensure_collections(db, LLM_CACHE_TTL_SECONDS, LLM_CALL_TTL_SECONDS)
 
         after = await db.list_collections(filter={"name": target})
         after_options = (await after.to_list())[0]["options"]

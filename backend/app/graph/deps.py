@@ -36,6 +36,7 @@ class GraphDeps:
     decisions: Any
     runs: Any
     node_execs: Any
+    llm_calls: Any  # MongoLlmCallRepository (finalize reads the run's estimated cost)
     audit: Any
     agents: Any  # AgentSuite (template or LLM)
 

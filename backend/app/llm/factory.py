@@ -13,6 +13,7 @@ from backend.app.agents.suite import AgentSuite, build_live_suite
 from backend.app.core.clock import Clock
 from backend.app.core.config_files import LlmConfig
 from backend.app.core.logging import get_logger
+from backend.app.llm.call_recorder import LlmCallRecorder
 from backend.app.llm.client import LlmClient
 from backend.app.llm.http_providers import GeminiProvider, GroqProvider
 from backend.app.llm.provider import LLMProvider
@@ -20,8 +21,23 @@ from backend.app.llm.provider import LLMProvider
 _logger = get_logger(__name__)
 
 
-def build_agent_suite(*, llm_mode: str, cfg: LlmConfig, groq_key: str | None, gemini_key: str | None, cache: Any, clock: Clock, str_sections: list[str], tipping_terms: list[str]) -> AgentSuite:
-    """Return the template suite (fallback) or the live suite (live with keys)."""
+def build_agent_suite(
+    *,
+    llm_mode: str,
+    cfg: LlmConfig,
+    groq_key: str | None,
+    gemini_key: str | None,
+    cache: Any,
+    call_log: Any,
+    clock: Clock,
+    str_sections: list[str],
+    tipping_terms: list[str],
+) -> AgentSuite:
+    """Return the template suite (fallback) or the live suite (live with keys).
+
+    ``call_log`` is the ``llm_calls`` repository; every live attempt is written
+    to it through ``LlmCallRecorder``. Template agents make no calls to log.
+    """
     if llm_mode != "live":
         return AgentSuite()
     # Safety net only: LlmClient enforces the wall-clock limit with asyncio.timeout.
@@ -34,5 +50,6 @@ def build_agent_suite(*, llm_mode: str, cfg: LlmConfig, groq_key: str | None, ge
     if not providers:
         _logger.warning("LLM_MODE=live but no GROQ_API_KEY or GEMINI_API_KEY is set; using template agents")
         return AgentSuite()
-    client = LlmClient(providers, cfg.limits, cache, clock)
+    recorder = LlmCallRecorder(call_log, cfg.models, clock)
+    client = LlmClient(providers, cfg.limits, cache, clock, sink=recorder)
     return build_live_suite(client, cfg, str_sections, tipping_terms)

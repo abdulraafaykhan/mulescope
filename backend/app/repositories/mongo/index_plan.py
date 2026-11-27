@@ -127,6 +127,7 @@ def _static_operational_plan() -> tuple[IndexSpec, ...]:
             "case_runs_case_id_started_at",
             (("case_id", ASCENDING), ("started_at", DESCENDING)),
         ),
+        IndexSpec(Col.CASE_RUNS, "case_runs_started_at", (("started_at", DESCENDING),)),
         IndexSpec(
             Col.NODE_EXECUTIONS, "node_executions_run_id_started_at", _asc("run_id", "started_at")
         ),
@@ -145,34 +146,46 @@ def _static_operational_plan() -> tuple[IndexSpec, ...]:
         ),
         IndexSpec(Col.AUDIT_LOGS, "audit_logs_ts", _asc("ts")),
         IndexSpec(Col.LLM_CACHE, "llm_cache_key_uq", _asc("key"), unique=True),
+        IndexSpec(Col.LLM_CALLS, "llm_calls_run_id_created_at", _asc("run_id", "created_at")),
         IndexSpec(Col.EVAL_RUNS, "eval_runs_run_id", _asc("run_id")),
         IndexSpec(Col.EVAL_RESULTS, "eval_results_run_id", _asc("run_id")),
         # dataset_meta: no secondary indexes.
     )
 
 
-def operational_index_plan(llm_cache_ttl_seconds: int) -> tuple[IndexSpec, ...]:
+def operational_index_plan(
+    llm_cache_ttl_seconds: int, llm_call_ttl_seconds: int
+) -> tuple[IndexSpec, ...]:
     """Return the full operational index plan.
 
     Args:
         llm_cache_ttl_seconds: ``expireAfterSeconds`` for the ``llm_cache``
             ``created_at`` TTL index, sourced from ``LlmConfig.cache_ttl_seconds``.
+        llm_call_ttl_seconds: ``expireAfterSeconds`` for the ``llm_calls``
+            ``created_at`` TTL index, sourced from ``LlmConfig.call_log_ttl_seconds``.
+            The index also serves the observability time-range queries.
 
     Returns:
         Every named index for the ``mulescope`` database, in creation order.
 
     Raises:
-        ValueError: If ``llm_cache_ttl_seconds`` is not positive.
+        ValueError: If either TTL is not positive.
     """
-    if llm_cache_ttl_seconds <= 0:
-        raise ValueError("llm_cache_ttl_seconds must be positive")
-    ttl = IndexSpec(
+    if llm_cache_ttl_seconds <= 0 or llm_call_ttl_seconds <= 0:
+        raise ValueError("TTL seconds must be positive")
+    cache_ttl = IndexSpec(
         Col.LLM_CACHE,
         "llm_cache_created_at_ttl",
         _asc("created_at"),
         ttl_seconds=llm_cache_ttl_seconds,
     )
-    return (*_static_operational_plan(), ttl)
+    calls_ttl = IndexSpec(
+        Col.LLM_CALLS,
+        "llm_calls_created_at_ttl",
+        _asc("created_at"),
+        ttl_seconds=llm_call_ttl_seconds,
+    )
+    return (*_static_operational_plan(), cache_ttl, calls_ttl)
 
 
 TRUTH_INDEX_PLAN: tuple[IndexSpec, ...] = (

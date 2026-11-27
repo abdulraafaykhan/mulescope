@@ -1,6 +1,7 @@
 /**
- * Root: providers (TanStack Query, account drawer) and routes. The Evals page
- * and the case workspace (which carries React Flow) are lazy-loaded.
+ * Root: providers (TanStack Query, account drawer) and routes. The Evals and
+ * Observability pages and the case workspace (which carries React Flow) are
+ * lazy-loaded.
  */
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -12,6 +13,7 @@ import { SkeletonRows } from "../components/ui/primitives";
 
 const CaseWorkspace = lazy(() => import("../features/case-workspace/CaseWorkspace"));
 const EvalsPage = lazy(() => import("../features/evals/EvalsPage"));
+const ObservabilityPage = lazy(() => import("../features/observability/ObservabilityPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: false, retry: 1 } },
@@ -27,6 +29,7 @@ const router = createBrowserRouter([
       { index: true, element: <QueuePage /> },
       { path: "cases/:caseId", element: <Suspense fallback={fallback}><CaseWorkspace /></Suspense> },
       { path: "evals", element: <Suspense fallback={fallback}><EvalsPage /></Suspense> },
+      { path: "observability", element: <Suspense fallback={fallback}><ObservabilityPage /></Suspense> },
     ],
   },
 ]);

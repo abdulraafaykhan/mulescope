@@ -81,3 +81,24 @@ limits:
 # Response cache. ttl_days is the source of the llm_cache created_at TTL index.
 cache:
   ttl_days: 30
+
+# Estimated cost and free-tier watch on the observability page. Prices are Groq
+# list prices in USD per million tokens (not the free-tier bill, which is $0);
+# the 50% discount Groq gives on cached prompt tokens is ignored, so estimates
+# are an upper bound. A model missing here shows no cost.
+# TODO verify: prices and the 8K tokens-per-minute free-plan limit against
+# console.groq.com/docs (taken from third-party trackers, Nov 2026).
+models:
+  "openai/gpt-oss-20b":
+    input_usd_per_million: 0.075
+    output_usd_per_million: 0.30
+    tokens_per_minute: 8000
+  "openai/gpt-oss-120b":
+    input_usd_per_million: 0.15
+    output_usd_per_million: 0.60
+    tokens_per_minute: 8000
+
+# One llm_calls document per call attempt; call_log_ttl_days is the source of
+# its created_at TTL index.
+observability:
+  call_log_ttl_days: 30

@@ -101,7 +101,8 @@ body {
   --xy-minimap-background-color: var(--c-bg-app);
 }
 
-.md h2 { font-size: 16px; font-weight: 600; margin: 18px 0 8px; color: var(--c-text-primary); }
+.md h2 { font-size: 16px; font-weight: 600; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--c-border); color: var(--c-text-primary); }
+.md > h2:first-child { margin-top: 0; }
 .md h3 { font-size: 14px; font-weight: 600; margin: 12px 0 6px; color: var(--c-text-secondary); }
 .md p { margin: 6px 0; line-height: 1.6; }
 .md ul { margin: 6px 0; padding-left: 18px; list-style: disc; }

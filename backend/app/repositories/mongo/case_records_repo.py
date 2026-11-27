@@ -138,6 +138,11 @@ class MongoRunRepository:
     async def latest_for_case(self, case_id: str) -> dict[str, Any] | None:
         return plain(await self._col.find_one({"case_id": case_id}, sort=[("started_at", -1)]))
 
+    async def recent(self, since: datetime, limit: int) -> list[dict[str, Any]]:
+        """Runs started at or after ``since``, newest first."""
+        cursor = self._col.find({"started_at": {"$gte": since}}).sort("started_at", -1).limit(limit)
+        return [plain(d) async for d in cursor]  # type: ignore[misc]
+
     async def latest_for_cases(self, case_ids: list[str]) -> dict[str, dict[str, Any]]:
         out: dict[str, dict[str, Any]] = {}
         async for d in self._col.find({"case_id": {"$in": case_ids}}).sort("started_at", 1):

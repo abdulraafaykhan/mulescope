@@ -17,7 +17,11 @@ import type {
   EvalRunDetail,
   Evidence,
   Flow,
+  ObservabilityPeriod,
+  ObservabilitySummary,
+  ObservedRun,
   PublicConfig,
+  RunObservability,
   Queue,
   Report,
   Timeline,
@@ -41,9 +45,14 @@ export const keys = {
   account: (id: string) => ["account", id] as const,
   evalRuns: ["evals"] as const,
   evalRun: (id: string) => ["evals", id] as const,
+  obsSummary: (period: ObservabilityPeriod) => ["observability", "summary", period] as const,
+  obsRuns: (period: ObservabilityPeriod) => ["observability", "runs", period] as const,
+  obsRun: (runId: string) => ["observability", "run", runId] as const,
 };
 
 const ACTIVE_POLL_MS = 3000;
+// The free-tier watch looks at the last minute, so the summary refreshes often.
+const OBSERVABILITY_POLL_MS = 15_000;
 
 export function usePublicConfig() {
   return useQuery({ queryKey: keys.config, queryFn: () => api.get<PublicConfig>("/config/public"), staleTime: 60_000 });
@@ -127,6 +136,23 @@ export function useEvalRuns() {
 
 export function useEvalRun(runId: string | null) {
   return useQuery({ queryKey: keys.evalRun(runId ?? "none"), queryFn: () => api.get<EvalRunDetail>(`/evals/runs/${runId}`), enabled: Boolean(runId) });
+}
+
+export function useObservabilitySummary(period: ObservabilityPeriod) {
+  return useQuery({ queryKey: keys.obsSummary(period), queryFn: () => api.get<ObservabilitySummary>(`/observability/summary?period=${period}`), refetchInterval: OBSERVABILITY_POLL_MS });
+}
+
+export function useObservedRuns(period: ObservabilityPeriod) {
+  return useQuery({ queryKey: keys.obsRuns(period), queryFn: () => api.get<ObservedRun[]>(`/observability/runs?period=${period}&limit=100`), refetchInterval: OBSERVABILITY_POLL_MS });
+}
+
+export function useObservedRun(runId: string | null | undefined, active = false) {
+  return useQuery({
+    queryKey: keys.obsRun(runId ?? "none"),
+    queryFn: () => api.get<RunObservability>(`/observability/runs/${runId}`),
+    enabled: Boolean(runId),
+    refetchInterval: active ? ACTIVE_POLL_MS : false,
+  });
 }
 
 /** Refetch everything that belongs to one case (after a run event or decision). */

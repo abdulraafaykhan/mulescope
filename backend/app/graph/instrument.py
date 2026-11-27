@@ -4,7 +4,8 @@
 ``node_executions`` row (start, end, latency, tokens, retries, status,
 fallback flag and reason), appends an audit event to the case hash chain and publishes
 ``{node, status, message, tokens}`` through LangGraph's stream writer, so the
-node bodies stay free of logging code.
+node bodies stay free of logging code. It also binds the node scope, so every
+LLM call attempt made inside the node is logged with its case, run and node.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from langgraph.config import get_stream_writer
 from langgraph.errors import GraphInterrupt
 
 from backend.app.core.logging import bind_run_context, get_logger
+from backend.app.core.node_scope import NodeScope, bind_node_scope
 from backend.app.graph.deps import deps_of
 from backend.app.graph.state import CaseState
 
@@ -58,7 +60,8 @@ def node(name: str, agent: str = "code") -> Callable[[NodeFn], NodeFn]:
                 "started_at": started, "created_at": started, "latency_ms": None, "tokens_in": 0, "tokens_out": 0, "retries": 0, "fallback_used": False, "fallback_reason": None,
             })
             write({"type": "node", "node": name, "agent": agent, "status": "running", "message": f"{name} started", "tokens": 0})
-            with bind_run_context(case_id, run_id):
+            scope = NodeScope(case_id=case_id, run_id=run_id, node=name, agent=agent, node_exec_id=str(oid))
+            with bind_run_context(case_id, run_id), bind_node_scope(scope):
                 try:
                     update = await fn(state, config)
                 except GraphInterrupt:

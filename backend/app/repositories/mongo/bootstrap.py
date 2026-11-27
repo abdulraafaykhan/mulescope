@@ -68,20 +68,24 @@ _INDEX_CONFLICT_CODES: Final[frozenset[int]] = frozenset({85, 86})
 """``IndexOptionsConflict`` (85) and ``IndexKeySpecsConflict`` (86)."""
 
 
-async def ensure_collections(db: AsyncDatabase[Any], llm_cache_ttl_seconds: int) -> None:
+async def ensure_collections(
+    db: AsyncDatabase[Any], llm_cache_ttl_seconds: int, llm_call_ttl_seconds: int
+) -> None:
     """Create or refresh every operational collection, validator and index.
 
     Args:
         db: Handle to the operational ``mulescope`` database.
         llm_cache_ttl_seconds: ``expireAfterSeconds`` for the ``llm_cache``
             ``created_at`` TTL index, from ``LlmConfig.cache_ttl_seconds``.
+        llm_call_ttl_seconds: ``expireAfterSeconds`` for the ``llm_calls``
+            ``created_at`` TTL index, from ``LlmConfig.call_log_ttl_seconds``.
 
     Raises:
         DependencyUnavailable: If MongoDB is unreachable, or an existing index
             has the same name as a planned one but different options.
-        ValueError: If ``llm_cache_ttl_seconds`` is not positive.
+        ValueError: If either TTL is not positive.
     """
-    plan = operational_index_plan(llm_cache_ttl_seconds)
+    plan = operational_index_plan(llm_cache_ttl_seconds, llm_call_ttl_seconds)
     await _ensure(db, OPERATIONAL_VALIDATORS, plan, database_role="operational")
 
 

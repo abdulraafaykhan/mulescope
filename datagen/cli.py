@@ -87,7 +87,7 @@ async def _load(ctx: GenContext, ledger: Any, settings: DatagenSettings, reset: 
         if reset:
             await client.drop_database(settings.mongo_db_name)
             await truth_client.drop_database(settings.mongo_truth_db_name)
-        await ensure_collections(db, llm.cache_ttl_seconds)
+        await ensure_collections(db, llm.cache_ttl_seconds, llm.call_log_ttl_seconds)
         await ensure_truth_collections(truth_db)
 
         last_balance: dict[str, int] = dict(ledger.opening)

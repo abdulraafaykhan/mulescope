@@ -63,14 +63,23 @@ export function TimelineTab({ caseId }: { caseId: string }) {
   if (timeline.isError) return <ErrorState error={timeline.error} />;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="h-[300px] shrink-0 p-3">
+    // Chart and entry list share the height (3:2) so neither spills out of the panel.
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="min-h-[200px] flex-3 px-3 pt-3 pb-1">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+          <ComposedChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
             <CartesianGrid stroke="var(--c-border)" strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="label" tick={{ fill: "var(--c-text-muted)", fontSize: 11 }} stroke="var(--c-border)" />
             <YAxis yAxisId="amt" tickFormatter={inrCompact} tick={{ fill: "var(--c-text-muted)", fontSize: 11 }} stroke="var(--c-border)" width={56} />
-            <YAxis yAxisId="lag" orientation="right" tickFormatter={(v: number) => `${v}m`} tick={{ fill: "var(--c-text-muted)", fontSize: 11 }} stroke="var(--c-border)" width={40} />
+            <YAxis
+              yAxisId="lag"
+              orientation="right"
+              tickFormatter={(v: number) => minutes(v)}
+              tick={{ fill: "var(--c-text-muted)", fontSize: 11 }}
+              stroke="var(--c-border)"
+              width={52}
+              label={{ value: "exit lag", angle: 90, position: "insideRight", fill: "var(--c-text-muted)", fontSize: 11 }}
+            />
             <Tooltip
               contentStyle={tooltipStyle}
               labelStyle={{ color: "var(--c-text-primary)" }}
@@ -83,7 +92,7 @@ export function TimelineTab({ caseId }: { caseId: string }) {
             <Scatter yAxisId="lag" dataKey="lag" name="Exit lag" fill="var(--c-risk-critical)" shape="diamond" />
             <Brush
               dataKey="label"
-              height={18}
+              height={16}
               stroke="var(--c-accent)"
               fill="var(--c-bg-elevated)"
               travellerWidth={8}
@@ -94,11 +103,11 @@ export function TimelineTab({ caseId }: { caseId: string }) {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto border-t border-line">
-        <div className="sticky top-0 bg-elevated px-3 py-1.5 text-xs text-secondary">{events.length} entries in the selected range</div>
+      <div className="min-h-[96px] flex-2 overflow-y-auto border-t border-line">
+        <div className="sticky top-0 bg-elevated px-3 py-1.5 text-xs text-secondary">{events.length} entries in the selected range · drag the bar under the chart to narrow it</div>
         <ul className="text-xs">
           {events.map((e, i) => (
-            <li key={`${e.ts}-${i}`} className="grid grid-cols-[150px_20px_1fr_120px_120px] items-center gap-2 border-b border-line/50 px-3 py-1">
+            <li key={`${e.ts}-${i}`} className="grid grid-cols-[minmax(110px,150px)_16px_minmax(0,1fr)_minmax(90px,120px)_minmax(90px,120px)] items-center gap-2 border-b border-line/50 px-3 py-1">
               <span className="num text-muted">{istDateTime(e.ts)}</span>
               {e.direction === "credit" ? <ArrowDownLeft size={12} className="text-role-sender" aria-label="credit" /> : <ArrowUpRight size={12} className="text-role-receiver" aria-label="debit" />}
               <span className="num text-secondary uppercase">{e.channel.replace("_", " ")}</span>

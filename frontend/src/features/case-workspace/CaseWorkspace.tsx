@@ -2,37 +2,26 @@
  * Case workspace (section 9.3): sticky header, entity strip, left column
  * (score breakdown, evidence), centre tabs (flow, timeline, transactions,
  * report), right column (agents, actions) and the bottom drawer (audit,
- * diagnostics). This container owns the data hooks and passes data down.
+ * diagnostics). The centre tabs can open in a large view. The column row is
+ * clipped to its own height, so the drawer below takes space instead of
+ * covering it. This container owns the data hooks and passes data down.
  */
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { useCallback, useState } from "react";
 import { useParams } from "react-router";
-import { FileText, GitBranch, LineChart, Table } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useActions, useCase, useEvidence, useReport } from "../../lib/queries";
 import { useRunStream } from "../../lib/useRunStream";
-import { ErrorState, Panel, Skeleton, SkeletonRows } from "../../components/ui/primitives";
-import { Tabs } from "../../components/ui/overlays";
+import { Button, Empty, ErrorState, Panel, Skeleton, SkeletonRows } from "../../components/ui/primitives";
+import { LargeView } from "../../components/ui/overlays";
 import { EvidenceProvider } from "./EvidenceContext";
 import { CaseHeader } from "./CaseHeader";
 import { EntityStrip } from "./EntityStrip";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { EvidenceList } from "./EvidenceList";
-import { TimelineTab } from "./TimelineTab";
-import { TransactionsTab } from "./TransactionsTab";
-import { ReportTab } from "./ReportTab";
+import { CentreTabs, TabBarButton, type CentreTab } from "./CentreTabs";
 import { AgentsPanel } from "../agents/AgentsPanel";
 import { ActionsPanel } from "../actions/ActionsPanel";
 import { BottomDrawer } from "../audit/BottomDrawer";
-
-const MoneyFlow = lazy(() => import("../flow-graph/MoneyFlow"));
-
-type Tab = "flow" | "timeline" | "transactions" | "report";
-
-const TABS: { id: Tab; label: ReactNode }[] = [
-  { id: "flow", label: <><GitBranch size={14} aria-hidden /> Money flow</> },
-  { id: "timeline", label: <><LineChart size={14} aria-hidden /> Timeline</> },
-  { id: "transactions", label: <><Table size={14} aria-hidden /> Transactions</> },
-  { id: "report", label: <><FileText size={14} aria-hidden /> Report</> },
-];
 
 export default function CaseWorkspace() {
   const { caseId = "" } = useParams();
@@ -43,7 +32,9 @@ export default function CaseWorkspace() {
   const actions = useActions(caseId);
   const report = useReport(caseId, Boolean(run));
   const stream = useRunStream(caseId, run?.id, runActive);
-  const [tab, setTab] = useState<Tab>("flow");
+  const [tab, setTab] = useState<CentreTab>("flow");
+  const [large, setLarge] = useState(false);
+  const closeLarge = useCallback(() => setLarge(false), []);
 
   if (detail.isError) return <ErrorState error={detail.error} />;
   if (!detail.data) {
@@ -56,6 +47,7 @@ export default function CaseWorkspace() {
     );
   }
   const d = detail.data;
+  const centre = { tab, onTab: setTab, caseId, detail: d, report: report.data ?? null, reportLoading: report.isLoading };
 
   return (
     <EvidenceProvider evidence={evidence.data ?? []} runId={run?.id ?? null}>
@@ -64,23 +56,17 @@ export default function CaseWorkspace() {
         <div className="shrink-0 px-3 pt-3">
           <EntityStrip strip={d.entity_strip} customer={d.customer} account={d.account} windowStart={d.alert.window.start} />
         </div>
-        <div className="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)_340px] gap-3 p-3">
+        <div className="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)_340px] grid-rows-[minmax(0,1fr)] gap-3 overflow-hidden p-3">
           <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
             <ScoreBreakdown evidence={evidence.data ?? []} score={d.case.score} typologies={d.case.typologies ?? []} loading={evidence.isLoading} />
             <EvidenceList evidence={evidence.data ?? []} loading={evidence.isLoading} hasRun={Boolean(run)} />
           </div>
-          <Panel className="flex min-h-0 flex-col" bodyClass="flex min-h-0 flex-1 flex-col">
-            <Tabs tabs={TABS} value={tab} onChange={setTab} />
-            <div className="min-h-0 flex-1">
-              {tab === "flow" && (
-                <Suspense fallback={<SkeletonRows rows={8} />}>
-                  <MoneyFlow caseId={caseId} />
-                </Suspense>
-              )}
-              {tab === "timeline" && <TimelineTab caseId={caseId} />}
-              {tab === "transactions" && <TransactionsTab caseId={caseId} />}
-              {tab === "report" && <ReportTab report={report.data ?? null} loading={report.isLoading} detail={d} />}
-            </div>
+          <Panel className="flex min-h-0 flex-col overflow-hidden" bodyClass="flex min-h-0 flex-1 flex-col">
+            <CentreTabs
+              {...centre}
+              action={<TabBarButton onClick={() => setLarge(true)} icon={<Maximize2 size={13} aria-hidden />} title="Open this view large (Esc closes)">Expand</TabBarButton>}
+              placeholder={large ? <Empty>Open in the large view. <Button size="sm" variant="ghost" onClick={closeLarge}>Bring it back</Button></Empty> : undefined}
+            />
           </Panel>
           <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
             <AgentsPanel run={run} events={stream.events} streamState={stream.state} />
@@ -89,6 +75,9 @@ export default function CaseWorkspace() {
         </div>
         <BottomDrawer caseId={caseId} runId={run?.id ?? null} runActive={runActive} />
       </div>
+      <LargeView open={large} onClose={closeLarge} label={`${d.case.id} large view`}>
+        <CentreTabs {...centre} action={<TabBarButton onClick={closeLarge} icon={<Minimize2 size={13} aria-hidden />} title="Close the large view (Esc)">Close</TabBarButton>} />
+      </LargeView>
     </EvidenceProvider>
   );
 }

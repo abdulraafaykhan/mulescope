@@ -3,7 +3,7 @@
  * and disposition styling. Colours reference the design tokens so the same
  * colour means the same thing everywhere (stepper, logs, charts).
  */
-import type { ActionStatus, AgentKind, CaseStatus, Disposition, NodeStatus } from "../types/api";
+import type { ActionStatus, AgentKind, CaseStatus, Disposition, LlmCallOutcome, NodeStatus } from "../types/api";
 
 /** Graph nodes in execution order (graph/builder.py GRAPH_NODES). */
 export const GRAPH_NODES: { node: string; agent: AgentKind; label: string }[] = [
@@ -105,6 +105,17 @@ export function exitColor(minutes: number | null): string {
   if (minutes < 1440) return "var(--c-risk-medium)";
   return "var(--c-risk-low)";
 }
+
+/** LLM call attempt outcomes (llm_calls.outcome). */
+export const OUTCOME_META: Record<LlmCallOutcome, { label: string; color: string }> = {
+  ok: { label: "OK", color: "var(--c-risk-low)" },
+  cache_hit: { label: "Cache hit", color: "var(--c-agent-profiler)" },
+  invalid_output: { label: "Invalid output", color: "var(--c-risk-medium)" },
+  rate_limited: { label: "Rate limited (429)", color: "var(--c-risk-high)" },
+  provider_error: { label: "Provider error", color: "var(--c-risk-critical)" },
+  timeout: { label: "Timeout", color: "var(--c-risk-critical)" },
+  budget_exceeded: { label: "Step budget spent", color: "var(--c-risk-critical)" },
+};
 
 export const SEVERITY_COLOR: Record<string, string> = {
   high: "var(--c-risk-critical)",

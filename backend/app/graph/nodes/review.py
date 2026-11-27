@@ -100,11 +100,13 @@ async def finalize(state: CaseState, config: RunnableConfig) -> dict[str, Any]:
     status = CaseStatus.RETURNED.value if decision == "reject" or not final else STATUS_BY_DISPOSITION[final]
     await deps.cases.update(state["case_id"], {"status": status, "final_disposition": final}, now)
     execs = await deps.node_execs.for_run(state["run_id"])
+    llm_usage = (await deps.llm_calls.totals_by_run([state["run_id"]])).get(state["run_id"], {})
     totals = {
         "tokens": sum(int(e.get("tokens_in") or 0) + int(e.get("tokens_out") or 0) for e in execs),
         "latency_ms": sum(int(e.get("latency_ms") or 0) for e in execs),
         "retries": sum(int(e.get("retries") or 0) for e in execs),
         "fallback_nodes": sum(1 for e in execs if e.get("fallback_used")),
+        "cost_usd": llm_usage.get("cost_usd", 0.0),
     }
     await deps.runs.update(state["run_id"], {"status": "completed", "ended_at": now, "totals": totals, "final_disposition": final}, now)
     head = await deps.audit.append(ts=now, actor={"type": "system", "id": "finalize"}, event="run.finalized", entity={"type": "case_run", "id": state["run_id"]}, case_id=state["case_id"], run_id=state["run_id"], payload={"status": status, "final_disposition": final, "totals": totals})

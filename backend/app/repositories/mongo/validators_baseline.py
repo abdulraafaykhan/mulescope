@@ -48,6 +48,7 @@ BASELINE_VALIDATORS: Mapping[str, JsonSchema] = MappingProxyType(
         Col.NODE_EXECUTIONS: _baseline(object_id()),
         Col.AUDIT_LOGS: _baseline(object_id()),
         Col.LLM_CACHE: _baseline(string_id()),
+        Col.LLM_CALLS: _baseline(object_id()),
         Col.EVAL_RUNS: _baseline(string_id()),
         Col.EVAL_RESULTS: _baseline(string_id()),
         Col.COUNTERS: _baseline(string_id()),

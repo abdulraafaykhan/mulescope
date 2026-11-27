@@ -133,6 +133,8 @@ export interface RunTotals {
   latency_ms: number;
   retries: number;
   fallback_nodes?: number;
+  /** Estimated USD at list price, written when the run finalizes. */
+  cost_usd?: number | null;
 }
 
 export interface CaseRun {
@@ -578,4 +580,136 @@ export interface EvalResult {
 export interface EvalRunDetail {
   run: EvalRun;
   results: EvalResult[];
+}
+
+// --- observability (api/schemas/observability.py) ---------------------------
+// Costs are USD estimates at the list prices in config/llm.yaml. Latency
+// excludes cache hits. A rate is null when its denominator is zero.
+
+export type ObservabilityPeriod = "24h" | "7d" | "all";
+export type LlmCallOutcome = "ok" | "cache_hit" | "invalid_output" | "rate_limited" | "provider_error" | "timeout" | "budget_exceeded";
+
+export interface LlmUsage {
+  attempts: number;
+  errors: number;
+  tokens_in: number;
+  tokens_out: number;
+  cost_usd: number;
+}
+
+export interface LlmLatency {
+  avg_latency_ms: number | null;
+  p95_latency_ms: number | null;
+}
+
+export interface ObservabilityTotals extends LlmUsage, LlmLatency {
+  /** Structured calls (one per agent step); attempts are every provider call and cache hit inside them. */
+  requests: number;
+  /** Requests where every attempt failed and the agent used its template. */
+  failed_requests: number;
+  provider_attempts: number;
+  cache_hits: number;
+  saved_tokens_in: number;
+  saved_tokens_out: number;
+  saved_cost_usd: number;
+  error_rate: number | null;
+  fallback_rate: number | null;
+  retry_rate: number | null;
+  cache_hit_rate: number | null;
+}
+
+export interface AgentUsage extends LlmUsage, LlmLatency {
+  agent: AgentKind | null;
+  models: string[];
+  prompt_versions: string[];
+  requests: number;
+  fallbacks: number;
+}
+
+export interface ModelUsage extends LlmUsage, LlmLatency {
+  model: string;
+}
+
+export interface UsagePoint extends LlmUsage {
+  /** Start of the IST hour or day. */
+  ts: IsoDate;
+}
+
+export interface RateLimitUsage {
+  model: string;
+  tokens_last_minute: number;
+  tokens_per_minute: number;
+  usage_ratio: number;
+}
+
+export interface ModelPrice {
+  model: string;
+  input_usd_per_million: number;
+  output_usd_per_million: number;
+  tokens_per_minute: number | null;
+}
+
+export interface ObservabilitySummary {
+  period: ObservabilityPeriod;
+  since: IsoDate;
+  generated_at: IsoDate;
+  totals: ObservabilityTotals;
+  by_agent: AgentUsage[];
+  by_model: ModelUsage[];
+  outcomes: { outcome: LlmCallOutcome; count: number }[];
+  series: { bucket: "hour" | "day"; points: UsagePoint[] };
+  rate_limits: RateLimitUsage[];
+  pricing: ModelPrice[];
+}
+
+export interface RunLlmUsage extends LlmUsage {
+  requests: number;
+  cache_hits: number;
+  saved_cost_usd: number;
+  llm_latency_ms: number;
+}
+
+export interface ObservedRun {
+  id: string;
+  case_id: string;
+  status: RunStatus;
+  llm_mode: LlmMode;
+  graph_version: string;
+  models: Record<string, string>;
+  prompt_versions: Record<string, string>;
+  started_at: IsoDate;
+  ended_at: IsoDate | null;
+  final_disposition?: Disposition | null;
+  totals: RunTotals;
+  llm: RunLlmUsage;
+}
+
+export type ObservedStep = Omit<NodeExecution, "run_id" | "case_id" | "tool_calls"> & { cost_usd: number | null };
+
+export interface LlmAttemptRecord {
+  id: string;
+  call_id: string;
+  node: string | null;
+  agent: AgentKind | null;
+  node_exec_id: string | null;
+  provider: string;
+  model: string;
+  prompt_version: string;
+  attempt: number;
+  outcome: LlmCallOutcome;
+  latency_ms: number;
+  tokens_in: number;
+  tokens_out: number;
+  saved_tokens_in: number;
+  saved_tokens_out: number;
+  cost_usd: number | null;
+  saved_cost_usd: number | null;
+  error: string | null;
+  created_at: IsoDate;
+}
+
+export interface RunObservability {
+  run: ObservedRun;
+  steps: ObservedStep[];
+  attempts: LlmAttemptRecord[];
 }

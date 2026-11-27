@@ -59,12 +59,21 @@ class ProviderError(Exception):
         message: What went wrong (never includes the API key).
         retryable: True for rate limits, timeouts and 5xx responses.
         retry_after: Seconds the provider asked us to wait, if it said.
+        status: HTTP status of the response, ``None`` for transport errors.
     """
 
-    def __init__(self, message: str, *, retryable: bool, retry_after: float | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool,
+        retry_after: float | None = None,
+        status: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.retryable = retryable
         self.retry_after = retry_after
+        self.status = status
 
 
 class LLMProvider(Protocol):
